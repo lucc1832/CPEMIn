@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#191b29">
+    <title>CPEManager</title>
+    <link rel="manifest" href="./manifest.webmanifest">
+    <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+<div class="app-shell">
+    <header class="topbar">
+        <div>
+            <h1>CPEManager 3.8.1&#65288;&#26410;&#25480;&#26435;&#65289;</h1>
+            <div class="subline" id="deviceHeadline">&#26412;&#22320;&#27169;&#24335;</div>
+        </div>
+        <div class="top-actions">
+            <button class="icon-button" id="installApp" title="Install">+</button>
+            <button class="icon-button" id="refreshNow" title="Refresh">&#8635;</button>
+            <button class="icon-button" id="saveSettingsTop" title="Save">&#9635;</button>
+        </div>
+    </header>
+
+    <nav class="tabs" aria-label="tabs">
+        <button class="tab" data-tab="logs">&#26085;&#24535;</button>
+        <button class="tab" data-tab="settings">&#35774;&#32622;</button>
+        <button class="tab" data-tab="account">&#36134;&#21495;</button>
+        <button class="tab" data-tab="plugins">&#25554;&#20214;</button>
+        <button class="tab" data-tab="phone">&#25163;&#26426;</button>
+        <button class="tab active" data-tab="firefly">&#28925;&#28779;</button>
+    </nav>
+
+    <main class="workspace">
+        <section class="panel tab-panel active" id="panel-firefly">
+            <div class="device-strip">
+                <div class="network-line"><span id="operatorName">&#31227;&#21160;</span> <span
+                        id="networkMode">SA</span> &uarr;&darr;
+                </div>
+                <div class="thermo" id="temperatureBar"><span>33&deg;C</span></div>
+                <div class="power-glyph" title="&#20379;&#30005;&#29366;&#24577;">&#9889;</div>
+            </div>
+
+            <div class="identity-row">
+                <div><strong>&#22411;&#21495;&#65306;</strong><span id="modelValue">LG6151M</span>
+                </div>
+                <div><strong>&#29256;&#26412;&#65306;</strong><span id="versionValue">RP0102</span>
+                </div>
+            </div>
+
+            <div class="section-title">
+                <strong>&#31614;&#32422;&#20449;&#24687;</strong>
+                <span id="contractLine">1000Mbps &darr; 100Mbps &uarr; QCI:9</span>
+            </div>
+
+            <div class="cell-summary">
+                <div><strong>Band</strong><span id="bandValue">N28</span></div>
+                <div><strong>ARFCN</strong><span id="arfcnValue">152650</span></div>
+                <div><strong>PCI</strong><span id="pciValue">360</span></div>
+                <div><strong>TAC</strong><span id="tacValue">1179698</span></div>
+                <div><strong>gCellID</strong><span id="gcellValue">67324/331</span></div>
+            </div>
+
+            <div class="metrics-grid">
+                <div class="metric"><span>NR_RSRP</span>
+                    <div class="meter" id="nrRsrp"></div>
+                </div>
+                <div class="metric"><span>NR_SINR</span>
+                    <div class="meter" id="nrSinr"></div>
+                </div>
+                <div class="metric"><span>NR_RSRQ</span>
+                    <div class="meter" id="nrRsrq"></div>
+                </div>
+                <div class="metric"><span>NR_ULBW</span>
+                    <div class="meter blue" id="nrUlbw"></div>
+                </div>
+                <div class="metric"><span>NR_DLBW</span>
+                    <div class="meter blue" id="nrDlbw"></div>
+                </div>
+                <div class="metric"><span>PUCCH</span>
+                    <div class="meter" id="pucch"></div>
+                </div>
+                <div class="metric"><span>PUSCH</span>
+                    <div class="meter" id="pusch"></div>
+                </div>
+                <div class="metric"><span>NR_ULMCS</span>
+                    <div class="meter blue" id="nrUlMcs"></div>
+                </div>
+                <div class="metric"><span>NR_DLMCS</span>
+                    <div class="meter neutral" id="nrDlMcs"></div>
+                </div>
+                <div class="metric mimo"><span>NR_MIMO</span><strong id="mimoValue">DL: 2 UL:
+                    2</strong></div>
+                <div class="metric"><span>NR_CQI</span>
+                    <div class="meter" id="nrCqi"></div>
+                </div>
+            </div>
+
+            <div class="traffic-grid">
+                <div><strong>&#19979;&#36733;&#36895;&#29575;</strong><span id="downloadRate">14.73Kbps</span>
+                </div>
+                <div><strong>&#19978;&#20256;&#36895;&#29575;</strong><span
+                        id="uploadRate">6.54Kbps</span></div>
+                <div><strong>&#26412;&#26085;&#19979;&#36733;</strong><span id="todayDownload">7.23GB</span>
+                </div>
+                <div><strong>&#26412;&#26085;&#19978;&#20256;</strong><span
+                        id="todayUpload">1.01GB</span></div>
+                <div><strong>&#26412;&#26376;&#19979;&#36733;</strong><span id="monthDownload">42.88GB</span>
+                </div>
+                <div><strong>&#26412;&#26376;&#19978;&#20256;</strong><span
+                        id="monthUpload">2.94GB</span></div>
+            </div>
+
+            <div class="table-wrap">
+                <table class="cells-table">
+                    <thead>
+                    <tr>
+                        <th></th>
+                        <th>Band</th>
+                        <th>EARFCN</th>
+                        <th>PCI</th>
+                        <th>RSRP</th>
+                        <th>RSRQ</th>
+                        <th>SINR</th>
+                    </tr>
+                    </thead>
+                    <tbody id="cellsBody"></tbody>
+                </table>
+            </div>
+
+            <div class="inline-control">
+                <label>&#39134;&#34892;&#27169;&#24335;&#65306;</label>
+                <input type="checkbox" id="airplaneToggle">
+                <span>&#21551;&#29992;</span>
+            </div>
+            <div class="button-row cpe-actions">
+                <button id="openBackendPageFirefly">&#25171;&#24320;&#30495;&#23454;&#28925;&#28779;&#21518;&#21488;</button>
+            </div>
+        </section>
+
+        <section class="panel tab-panel" id="panel-lock">
+            <div class="form-grid compact">
+                <label><span>&#38145;&#23450;&#39057;&#27573;</span><select id="bandSelect" multiple
+                                                                            size="6">
+                    <option>N1</option>
+                    <option>N3</option>
+                    <option>N5</option>
+                    <option>N8</option>
+                    <option>N28</option>
+                    <option>N41</option>
+                    <option>N78</option>
+                    <option>N79</option>
+                </select></label>
+                <label><span>&#39318;&#36873; PCI</span><input id="preferredPci" inputmode="numeric"
+                                                               placeholder="385"></label>
+                <label><span>&#39318;&#36873; ARFCN</span><input id="preferredArfcn"
+                                                                 inputmode="numeric"
+                                                                 placeholder="152650"></label>
+            </div>
+            <div class="button-row">
+                <button id="applyLock">&#24212;&#29992;&#38145;&#39057;</button>
+                <button id="clearLock">&#28165;&#31354;</button>
+            </div>
+        </section>
+
+        <section class="panel tab-panel" id="panel-logs">
+            <div class="log-list" id="logList"></div>
+        </section>
+
+        <section class="panel tab-panel" id="panel-settings">
+            <div class="form-grid">
+                <label><span>&#35774;&#22791;&#22320;&#22336;</span><input id="settingHost"
+                                                                           placeholder="192.168.8.1"></label>
+                <label><span>&#31471;&#21475;</span><input id="settingPort" inputmode="numeric"
+                                                           placeholder="80"></label>
+                <label><span>&#29992;&#25143;&#21517;</span><input id="settingUser"
+                                                                   autocomplete="username"></label>
+                <label><span>&#23494;&#30721;</span><input id="settingPass" type="password"
+                                                           autocomplete="current-password"></label>
+                <label><span>&#21378;&#23478;</span><select id="settingVendor">
+                    <option value="firehome">&#28925;&#28779;</option>
+                    <option value="huawei">&#21326;&#20026;</option>
+                    <option value="zte">&#20013;&#20852;</option>
+                    <option value="generic">&#36890;&#29992;</option>
+                </select></label>
+                <label><span>&#36830;&#25509;&#26041;&#24335;</span><select id="settingProtocol">
+                    <option value="firehome-api">&#28925;&#28779;&#21152;&#23494; API</option>
+                    <option value="firehome-http">&#28925;&#28779; HTTP &#21518;&#21488;</option>
+                    <option value="proxy">&#30005;&#33041;&#20195;&#29702;</option>
+                </select></label>
+                <label><span>&#29366;&#24577;&#25509;&#21475;&#36335;&#24452;</span><input
+                        id="statusPath" placeholder="/api/status"></label>
+                <label><span>&#30331;&#24405;&#25509;&#21475;&#36335;&#24452;</span><input
+                        id="loginPath" placeholder="/"></label>
+            </div>
+            <div class="button-row">
+                <button id="saveSettings">&#20445;&#23384;&#35774;&#32622;</button>
+                <button id="loginDevice">&#27979;&#35797;&#36830;&#25509;</button>
+                <button id="probeDevice">&#25506;&#27979;&#25509;&#21475;</button>
+                <button id="openBackendPage">&#30495;&#23454;&#21518;&#21488;&#32593;&#39029;
+                </button>
+            </div>
+        </section>
+
+        <section class="panel tab-panel" id="panel-account">
+            <div class="status-grid">
+                <div><strong>&#36134;&#21495;&#29366;&#24577;</strong><span>&#26412;&#22320;&#27491;&#24120;</span>
+                </div>
+                <div><strong>&#25480;&#26435;&#27169;&#24335;</strong><span>&#29420;&#31435;&#26412;&#22320;&#24037;&#20855;</span>
+                </div>
+                <div><strong>&#25968;&#25454;&#26469;&#28304;</strong><span id="dataMode">&#26412;&#22320;&#27169;&#25311;</span>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel tab-panel" id="panel-plugins">
+            <div class="plugin-grid">
+                <div>
+                    <strong>&#20449;&#21495;&#38754;&#26495;</strong><span>&#24050;&#21551;&#29992;</span>
+                </div>
+                <div><strong>&#26085;&#24535;</strong><span>&#24050;&#21551;&#29992;</span></div>
+                <div>
+                    <strong>&#37197;&#32622;&#20445;&#23384;</strong><span>&#24050;&#21551;&#29992;</span>
+                </div>
+                <div><strong>&#30495;&#23454;&#35774;&#22791;&#36866;&#37197;</strong><span>&#24453;&#25509;&#20837;</span>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel tab-panel" id="panel-phone">
+            <div class="phone-tabs">
+                <button class="phone-tab active" data-phone-tab="cellular">&#34562;&#31389;</button>
+                <button class="phone-tab" data-phone-tab="wifi">WLAN</button>
+            </div>
+            <div class="phone-toolbar">
+                <button id="refreshPhoneSignal">&#21047;&#26032;&#25163;&#26426;&#20449;&#21495;
+                </button>
+                <button id="requestPhonePermission">&#25480;&#26435;</button>
+            </div>
+            <div class="phone-message" id="phoneSignalMessage">&#31561;&#24453;&#35835;&#21462;&#25163;&#26426;&#20449;&#21495;&#12290;</div>
+            <div class="phone-panel active" id="phoneCellularPanel">
+                <div id="phoneCellularCards" class="phone-cellular-cards"></div>
+            </div>
+            <div class="phone-panel" id="phoneWifiPanel">
+                <div class="wifi-grid" id="phoneWifiGrid"></div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="bottom-bar">
+        <button id="rebootDevice">&#37325;&#21551;</button>
+        <button id="logoutDevice">&#36864;&#20986;</button>
+        <label class="auto-refresh"><input type="checkbox" id="autoRefresh"> &#33258;&#21160;&#21047;&#26032;</label>
+    </footer>
+
+    <div class="message-line" id="messageLine">&#20934;&#22791;&#23601;&#32490;&#12290;</div>
+</div>
+
+<script src="./app.js"></script>
+</body>
+</html>

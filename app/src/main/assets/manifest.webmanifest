@@ -1,0 +1,18 @@
+{
+  "name": "Local CPE Mobile",
+  "short_name": "CPE Mobile",
+  "description": "Local mobile CPE manager",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#eaf4f5",
+  "theme_color": "#eaf4f5",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
