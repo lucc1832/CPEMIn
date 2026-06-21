@@ -22,10 +22,13 @@ import android.telephony.SubscriptionInfo
 import android.telephony.SubscriptionManager
 import android.telephony.TelephonyManager
 import android.util.Base64
+import android.util.Log
+import android.view.View
 import android.webkit.JavascriptInterface
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.FrameLayout
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.core.net.toUri
@@ -41,14 +44,25 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.nio.charset.StandardCharsets
 import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
 import javax.crypto.Cipher
 import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.SecretKeySpec
 
 @Suppress("DEPRECATION")
 class MainActivity : ComponentActivity() {
+    // 主 WebView 承载 assets/index.html，页面 UI 和大部分交互都在前端完成。
     private lateinit var webView: WebView
+    private lateinit var rootView: FrameLayout
+    // 隐藏 WebView 是兼容备用方案；正常读取烽火状态优先走本地 FHTOOLAPIS。
+    private var hiddenWebView: WebView? = null
+    private var hiddenHost = ""
+    private val hiddenAsyncTokens = ConcurrentHashMap<String, Boolean>()
+    // 旧网页登录流程缓存，保留给少数需要网页登录的设备。
     private var fiberAuthCache: FiberAuth? = null
+    // 记录本地 app_do_login 唤醒时间，避免自动刷新太快导致账号保护。
+    private val fiberToolWakeTimes = ConcurrentHashMap<String, Long>()
+    private val fiberToolWakeCooldownMs = 10 * 60 * 1000L
 
     private val phonePermissions = arrayOf(
         Manifest.permission.ACCESS_FINE_LOCATION,
@@ -60,30 +74,28 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         CookieHandler.setDefault(CookieManager())
-        requestPhonePermissionsIfNeeded()
 
+        rootView = FrameLayout(this)
         webView = WebView(this)
-        setContentView(webView)
+        rootView.addView(
+            webView,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+        )
+        setContentView(rootView)
 
-        webView.settings.apply {
-            javaScriptEnabled = true
-            domStorageEnabled = true
-            databaseEnabled = true
-            allowFileAccess = true
-            allowContentAccess = true
-            allowFileAccessFromFileURLs = true
-            allowUniversalAccessFromFileURLs = true
-            mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
-            cacheMode = WebSettings.LOAD_NO_CACHE
-            textZoom = 100
-            useWideViewPort = true
-            loadWithOverviewMode = true
-            userAgentString = mobileChromeUserAgent
-        }
+        configureWebView(webView)
 
         webView.webViewClient = WebViewClient()
         webView.addJavascriptInterface(CpeBridge(), "CpeNative")
-        webView.loadUrl("file:///android_asset/index.html")
+        val startUrl = if (intent?.getBooleanExtra("autotest", false) == true) {
+            "file:///android_asset/index.html?autotest=1"
+        } else {
+            "file:///android_asset/index.html"
+        }
+        webView.loadUrl(startUrl)
 
         onBackPressedDispatcher.addCallback(
             this,
@@ -99,6 +111,26 @@ class MainActivity : ComponentActivity() {
         )
     }
 
+    @SuppressLint("SetJavaScriptEnabled")
+    private fun configureWebView(target: WebView) {
+        // 允许本地 HTML 访问路由器 HTTP 接口，这是 APK 内嵌页面能直连 CPE 的关键。
+        target.settings.apply {
+            javaScriptEnabled = true
+            domStorageEnabled = true
+            databaseEnabled = true
+            allowFileAccess = true
+            allowContentAccess = true
+            allowFileAccessFromFileURLs = true
+            allowUniversalAccessFromFileURLs = true
+            mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+            cacheMode = WebSettings.LOAD_NO_CACHE
+            textZoom = 100
+            useWideViewPort = true
+            loadWithOverviewMode = true
+            userAgentString = mobileChromeUserAgent
+        }
+    }
+
     private fun requestPhonePermissionsIfNeeded() {
         val missing = phonePermissions.filter {
             checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED
@@ -112,6 +144,7 @@ class MainActivity : ComponentActivity() {
 
     @Suppress("unused")
     inner class CpeBridge {
+        // 前端通过 window.CpeNative 调用这些方法，获得 Android 原生网络和手机信号能力。
         @JavascriptInterface
         fun openUrl(address: String): String {
             runOnUiThread { webView.loadUrl(address) }
@@ -149,6 +182,11 @@ class MainActivity : ComponentActivity() {
         }
 
         @JavascriptInterface
+        fun getWifiGateway(): String {
+            return readWifiGatewayJson()
+        }
+
+        @JavascriptInterface
         fun httpGet(address: String): String {
             return request("GET", address, null)
         }
@@ -161,6 +199,28 @@ class MainActivity : ComponentActivity() {
         @JavascriptInterface
         fun fiberHomeStatus(hostAndPort: String, username: String, password: String): String {
             return readFiberHomeStatus(hostAndPort, username, password)
+        }
+
+        @JavascriptInterface
+        fun fiberHomeStatusAsync(
+            token: String,
+            hostAndPort: String,
+            username: String,
+            password: String
+        ): String {
+            return try {
+                startFiberHomeStatusWithOfficialWeb(token, hostAndPort, username, password)
+                "{\"ok\":true}"
+            } catch (error: Exception) {
+                deliverHiddenResult(
+                    token,
+                    JSONObject()
+                        .put("ok", false)
+                        .put("error", error.message ?: error.javaClass.simpleName)
+                        .toString()
+                )
+                "{\"ok\":false,\"error\":${quote(error.message ?: error.javaClass.simpleName)}}"
+            }
         }
 
         private fun request(method: String, address: String, requestBody: String?): String {
@@ -198,6 +258,263 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    @Suppress("unused")
+    inner class HiddenCpeBridge {
+        @JavascriptInterface
+        fun onResult(token: String, payload: String) {
+            Log.d("CpeHidden", "result token=$token length=${payload.length}")
+            deliverHiddenResult(token, payload)
+        }
+    }
+
+    private fun deliverHiddenResult(token: String, payload: String) {
+        hiddenAsyncTokens.remove(token)
+        val callbackScript = """
+            (function() {
+              const callback = window.__cpeNativeFiberHomeResult;
+              if (typeof callback === "function") {
+                callback(${JSONObject.quote(token)}, ${JSONObject.quote(payload)});
+              }
+            })();
+        """.trimIndent()
+        runOnUiThread {
+            if (::webView.isInitialized) webView.evaluateJavascript(callbackScript, null)
+        }
+    }
+
+    private fun startFiberHomeStatusWithOfficialWeb(
+        token: String,
+        hostAndPort: String,
+        username: String,
+        password: String
+    ) {
+        val host = hostAndPort.trim()
+            .removePrefix("http://")
+            .removePrefix("https://")
+            .trimEnd('/')
+        require(host.isNotBlank()) { "device host is blank" }
+
+        hiddenAsyncTokens[token] = true
+        Log.d("CpeHidden", "async start host=$host token=$token")
+        Thread {
+            try {
+                // 烽火直连优先读本地工具接口；正常读取不需要反复登录，只有 timeout 时才用账号密码低频唤醒。
+                val direct = readFiberHomeToolBaseInfo(host, username, password)
+                if (direct != null && isHiddenTokenActive(token)) {
+                    deliverHiddenResult(token, direct.toString())
+                    return@Thread
+                }
+            } catch (error: Exception) {
+                Log.d("CpeHidden", "tool api failed host=$host error=${error.message}")
+            }
+
+            deliverHiddenResult(
+                token,
+                JSONObject()
+                    .put("ok", false)
+                    .put("error", "烽火本地接口暂时 timeout，正在等待设备返回数据")
+                    .toString()
+            )
+        }.start()
+    }
+
+    private fun isHiddenTokenActive(token: String): Boolean {
+        return hiddenAsyncTokens.containsKey(token)
+    }
+
+    // 备用网页登录方案：当前主路径走 FHTOOLAPIS，这段保留给后续兼容需要网页登录的固件。
+    @Suppress("unused")
+    private fun loadFiberHomeHiddenPage(
+        token: String,
+        host: String,
+        username: String,
+        password: String
+    ) {
+        runOnUiThread {
+            try {
+                val hidden = ensureHiddenWebView()
+                val script = fiberHomeOfficialScript(token, username, password)
+                val runScript = {
+                    if (isHiddenTokenActive(token)) {
+                        Log.d("CpeHidden", "evaluate token=$token url=${hidden.url}")
+                        hidden.evaluateJavascript(script) { result ->
+                            Log.d("CpeHidden", "evaluateResult token=$token result=${result?.take(120)}")
+                        }
+                    }
+                }
+                val scheduleScript = {
+                    hidden.postDelayed({ runScript() }, 1200L)
+                    hidden.postDelayed({ runScript() }, 3000L)
+                    hidden.postDelayed({ runScript() }, 6000L)
+                }
+                val hostName = host.substringBefore(':')
+
+                hidden.webViewClient = object : WebViewClient() {
+                    override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
+                        Log.d("CpeHidden", "pageStarted token=$token url=$url")
+                        if (url?.contains(hostName) == true) scheduleScript()
+                    }
+
+                    override fun onPageFinished(view: WebView?, url: String?) {
+                        Log.d("CpeHidden", "pageFinished token=$token url=$url")
+                        if (url?.contains(hostName) == true) runScript()
+                    }
+                }
+
+                if (hiddenHost != host || hidden.url?.contains(hostName) != true) {
+                    hiddenHost = host
+                    Log.d("CpeHidden", "load http://$host/login.html")
+                    hidden.loadUrl("http://$host/login.html")
+                    scheduleScript()
+                } else {
+                    scheduleScript()
+                }
+            } catch (error: Exception) {
+                if (hiddenAsyncTokens.containsKey(token)) {
+                    deliverHiddenResult(
+                        token,
+                        JSONObject()
+                            .put("ok", false)
+                            .put("error", error.message ?: error.javaClass.simpleName)
+                            .toString()
+                    )
+                }
+            }
+        }
+    }
+
+    private fun ensureHiddenWebView(): WebView {
+        hiddenWebView?.let { return it }
+        val hidden = WebView(this)
+        configureWebView(hidden)
+        hidden.visibility = View.INVISIBLE
+        hidden.addJavascriptInterface(HiddenCpeBridge(), "CpeHidden")
+        rootView.addView(hidden, FrameLayout.LayoutParams(1, 1))
+        hiddenWebView = hidden
+        return hidden
+    }
+
+    private fun fiberHomeOfficialScript(token: String, username: String, password: String): String {
+        val rfFields = JSONObject()
+            .put("TAC", "X_FH_MobileNetwork.RadioSignalParameter.TAC")
+            .put("PLMN", "X_FH_MobileNetwork.RadioSignalParameter.PLMN")
+            .put("EARFCN_NBR", "X_FH_MobileNetwork.RadioSignalParameter.EARFCN_NBR")
+            .put("RSRP_NBR", "X_FH_MobileNetwork.RadioSignalParameter.RSRP_NBR")
+            .put("WorkMode", "X_FH_MobileNetwork.RadioSignalParameter.WorkMode")
+            .put("PCI_NBR", "X_FH_MobileNetwork.RadioSignalParameter.PCI_NBR")
+            .put("BAND_NBR", "X_FH_MobileNetwork.RadioSignalParameter.BAND_NBR")
+            .put("SINR_NBR", "X_FH_MobileNetwork.RadioSignalParameter.SINR_NBR")
+            .put("RSRQ", "X_FH_MobileNetwork.RadioSignalParameter.RSRQ")
+            .put("RSSI", "X_FH_MobileNetwork.RadioSignalParameter.RSSI")
+            .put("SSB_RSRP", "X_FH_MobileNetwork.RadioSignalParameter.SSB_RSRP")
+            .put("SSB_SINR", "X_FH_MobileNetwork.RadioSignalParameter.SSB_SINR")
+            .put("SSB_RSSI", "X_FH_MobileNetwork.RadioSignalParameter.SSB_RSSI")
+            .put("SSB_RSRQ", "X_FH_MobileNetwork.RadioSignalParameter.SSB_RSRQ")
+            .put("NR_BAND", "X_FH_MobileNetwork.RadioSignalParameter.NR_Band")
+            .put("NR_Power", "X_FH_MobileNetwork.RadioSignalParameter.NR_Power")
+            .put("NR_CQI", "X_FH_MobileNetwork.RadioSignalParameter.NR_CQI")
+            .put("RSRP", "X_FH_MobileNetwork.RadioSignalParameter.RSRP")
+            .put("SINR", "X_FH_MobileNetwork.RadioSignalParameter.SINR")
+            .put("BAND", "X_FH_MobileNetwork.RadioSignalParameter.BAND")
+            .put("LTE_Power", "X_FH_MobileNetwork.RadioSignalParameter.LTE_Power")
+            .put("LTE_CQI", "X_FH_MobileNetwork.RadioSignalParameter.LTE_CQI")
+            .put("PCI", "X_FH_MobileNetwork.RadioSignalParameter.PCI")
+            .put("NetworkMode", "X_FH_MobileNetwork.SIM.1.NetworkMode")
+            .put("NCGI", "X_FH_MobileNetwork.RadioSignalParameter.NCGI")
+            .put("ECGI", "X_FH_MobileNetwork.RadioSignalParameter.ECGI")
+            .put("QCI", "X_FH_MobileNetwork.RadioSignalParameter.QCI")
+            .put("NR_QCI", "X_FH_MobileNetwork.RadioSignalParameter.NR_QCI")
+            .put("DL_AMBR", "X_FH_MobileNetwork.RadioSignalParameter.DL_AMBR")
+            .put("UL_AMBR", "X_FH_MobileNetwork.RadioSignalParameter.UL_AMBR")
+            .put("NR_PCI", "X_FH_MobileNetwork.RadioSignalParameter.NR_PCI")
+            .put("NR_DLBW", "X_FH_MobileNetwork.RadioSignalParameter.NR_DLBW")
+            .put("NR_ULBW", "X_FH_MobileNetwork.RadioSignalParameter.NR_ULBW")
+            .put("NR_DLMCS", "X_FH_MobileNetwork.RadioSignalParameter.NR_DLMCS")
+            .put("NR_ULMCS", "X_FH_MobileNetwork.RadioSignalParameter.NR_ULMCS")
+            .put("NR_MIMO_DL", "X_FH_MobileNetwork.RadioSignalParameter.NR_MIMO_DL")
+            .put("NR_MIMO_UL", "X_FH_MobileNetwork.RadioSignalParameter.NR_MIMO_UL")
+            .put("Temperature", "X_FH_MobileNetwork.RadioSignalParameter.Temperature")
+            .put("DeviceTemperature", "Device.DeviceInfo.TemperatureStatus.TemperatureSensor.1.Value")
+            .put("DeviceTemperature2", "Device.DeviceInfo.TemperatureStatus.TemperatureSensor.1.Temperature")
+            .put("FHDeviceTemperature", "Device.DeviceInfo.X_FH_Temperature")
+            .put("IGDTemperature", "InternetGatewayDevice.DeviceInfo.X_FH_Temperature")
+            .put("SoftwareVersion", "Device.DeviceInfo.SoftwareVersion")
+            .put("IGDSoftwareVersion", "InternetGatewayDevice.DeviceInfo.SoftwareVersion")
+            .put("HardwareVersion", "Device.DeviceInfo.HardwareVersion")
+            .put("ProductSoftwareVersion", "X_FH_DeviceInfo.SoftwareVersion")
+            .toString()
+        val trafficFields = JSONObject()
+            .put("DayTrafficStatus", "X_FH_MobileNetwork.TrafficStats.TodayExcceed")
+            .put("MonthTrafficStatus", "X_FH_MobileNetwork.TrafficStats.MonthExcceed")
+            .put("TestSIMCardEnable", "X_FH_MobileNetwork.NetworkSettings.TestSIMCardEnable")
+            .put("TodayDownload", "X_FH_MobileNetwork.TrafficStats.TodayDownload")
+            .put("TodayUpload", "X_FH_MobileNetwork.TrafficStats.TodayUpload")
+            .put("MonthDownload", "X_FH_MobileNetwork.TrafficStats.MonthDownload")
+            .put("MonthUpload", "X_FH_MobileNetwork.TrafficStats.MonthUpload")
+            .put("DownloadRate", "X_FH_MobileNetwork.TrafficStats.DownloadRate")
+            .put("UploadRate", "X_FH_MobileNetwork.TrafficStats.UploadRate")
+            .toString()
+
+        return """
+            (function() {
+              const token = ${JSONObject.quote(token)};
+              const username = ${JSONObject.quote(username.ifBlank { "admin" })};
+              const password = ${JSONObject.quote(password)};
+              const rfFields = $rfFields;
+              const trafficFields = $trafficFields;
+              const done = (payload) => {
+                try { CpeHidden.onResult(token, JSON.stringify(payload || {})); } catch (e) {}
+              };
+              const waitForApi = () => new Promise((resolve, reject) => {
+                let tries = 0;
+                const tick = () => {
+                  if (typeof window.${'$'}post === "function" && typeof window.${'$'}get === "function") {
+                    resolve();
+                  } else if (++tries > 300) {
+                    reject(new Error("FiberHome page API not ready"));
+                  } else {
+                    setTimeout(tick, 100);
+                  }
+                };
+                tick();
+              });
+              (async () => {
+                await waitForApi();
+                const device = await window.${'$'}post("get_device_info", null, "nocheck");
+                const login = await window.${'$'}post("DO_WEB_LOGIN", { username, password });
+                if (!login || String(login.result) !== "0") {
+                  throw new Error("FiberHome login failed: result=" + String(login && login.result));
+                }
+                try { await window.${'$'}get("set_developer_mode", null); } catch (e) {}
+                let toolBaseInfo = {};
+                try {
+                  const toolResponse = await fetch("/api/tmp/FHTOOLAPIS?ajaxmethod=app_get_base_info", { cache: "no-store" });
+                  if (toolResponse && toolResponse.ok) toolBaseInfo = await toolResponse.json();
+                } catch (e) {}
+                const header = await window.${'$'}get("get_header_info");
+                const rf = await window.${'$'}post("get_value_by_xmlnode", rfFields);
+                let traffic = {};
+                try { traffic = await window.${'$'}post("get_value_by_xmlnode", trafficFields); } catch (e) {}
+                done({
+                  ok: true,
+                  vendor: "firehome",
+                  responses: {
+                    device_info: device || {},
+                    tool_base_info: toolBaseInfo || {},
+                    login_result: { result: login.result },
+                    header_info: header || {},
+                    rf_signal: rf || {},
+                    traffic_status: traffic || {}
+                  },
+                  error: null
+                });
+              })().catch((error) => {
+                done({ ok: false, error: String((error && error.message) || error) });
+              });
+            })();
+        """.trimIndent()
+    }
+
     private fun openInsideWebView(address: String) {
         webView.loadUrl(
             address,
@@ -223,51 +540,35 @@ class MainActivity : ComponentActivity() {
             require(host.isNotBlank()) { "设备地址不能为空" }
             val baseUrl = "http://$host"
 
-            // FiberHome web UI flow: refresh session, AES-CBC login, then read non-mutating status methods.
+            readFiberHomeToolBaseInfo(host, username, password)?.let { return it.toString() }
+
+            // FiberHome web UI flow: refresh session, optionally log in, then read non-mutating status methods.
             val cached = fiberAuthCache?.takeIf {
                 it.host == host && it.expiresAt > System.currentTimeMillis()
             }
+            var loginError = ""
             val activeSession = if (cached != null) {
                 FiberSession(cached.sessionId, cached.token)
             } else {
                 val firstSession = fiberRefreshSession(baseUrl, emptyMap())
-                val loginHeaders = fiberHeaders(firstSession.sessionId, firstSession.token)
-                val loginPayload = JSONObject()
-                    .put(
-                        "dataObj",
-                        JSONObject()
-                            .put("username", username)
-                            .put("password", password)
-                    )
-                    .put("ajaxmethod", "DO_WEB_LOGIN")
-                    .put("sessionid", firstSession.sessionId)
-                    .toString()
-                val loginResponse = fiberHttp(
-                    "POST",
-                    "$baseUrl/api/sign/DO_WEB_LOGIN",
-                    fiberEncryptHex(loginPayload, firstSession.sessionId),
-                    loginHeaders
-                )
-                if (loginResponse.code >= 400) error("登录失败：HTTP ${loginResponse.code}")
-                fiberRefreshSession(baseUrl, loginHeaders)
+                val loginResult = fiberLogin(baseUrl, firstSession, username, password)
+                if (!loginResult.ok) loginError = loginResult.error
+                firstSession
             }
-            val activeHeaders = fiberHeaders(activeSession.sessionId, activeSession.token)
+            val activeHeaders = fiberHeaders(activeSession.sessionId, activeSession.token, baseUrl)
             val responses = JSONObject()
             var matched = 0
             val matchedMethods = mutableListOf<String>()
             val methods = cached?.methods?.takeIf { it.isNotEmpty() } ?: fiberReadMethods.flatMap {
-                listOf("FHAPIS:$it", "FHTOOLAPIS:$it")
+                listOf("FHNCAPIS:$it", "FHAPIS:$it", "FHTOOLAPIS:$it")
             }
 
             methods.forEach { methodSpec ->
+                if (matched >= 8) return@forEach
                 val apiKind = methodSpec.substringBefore(':', "FHAPIS")
                 val method = methodSpec.substringAfter(':', methodSpec)
                 try {
-                    val response = if (apiKind == "FHTOOLAPIS") {
-                        fiberToolApi(baseUrl, method, activeSession, activeHeaders)
-                    } else {
-                        fiberEncryptedApi(baseUrl, method, activeSession, activeHeaders)
-                    }
+                    val response = fiberStatusApi(baseUrl, apiKind, method, activeSession, activeHeaders)
                     if (response.code >= 400 || response.body.isBlank()) return@forEach
                     val decoded = if (apiKind == "FHTOOLAPIS") {
                         response.body
@@ -295,14 +596,28 @@ class MainActivity : ComponentActivity() {
                 null
             }
 
+            val errorMessage = if (matched == 0) {
+                val suffix = loginError.takeIf { it.isNotBlank() }?.let { "；登录提示：$it" } ?: ""
+                "已连到设备，但未匹配到当前固件的只读状态接口$suffix"
+            } else {
+                JSONObject.NULL
+            }
+            if (matched == 0) {
+                responses.put(
+                    "_connection",
+                    JSONObject()
+                        .put("deviceReachable", true)
+                        .put("session", "ok")
+                        .put("message", errorMessage)
+                )
+            }
+
             JSONObject()
-                .put("ok", matched > 0)
+                .put("ok", true)
                 .put("vendor", "firehome")
                 .put("responses", responses)
-                .put(
-                    "error",
-                    if (matched == 0) "已登录，但未匹配到当前固件的状态方法" else JSONObject.NULL
-                )
+                .put("warning", if (matched == 0) errorMessage else JSONObject.NULL)
+                .put("error", JSONObject.NULL)
                 .toString()
         } catch (error: Exception) {
             JSONObject()
@@ -312,40 +627,209 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun fiberEncryptedApi(
+    private fun fiberLogin(
         baseUrl: String,
-        method: String,
         session: FiberSession,
-        headers: Map<String, String>
-    ): FiberResponse {
-        val payload = JSONObject()
-            .put("dataObj", JSONObject())
-            .put("ajaxmethod", method)
-            .put("sessionid", session.sessionId)
-            .toString()
-        return fiberHttp(
-            "POST",
-            "$baseUrl/api/tmp/FHAPIS",
-            fiberEncryptHex(payload, session.sessionId),
-            headers
-        )
+        username: String,
+        password: String
+    ): FiberLoginResult {
+        if (username.isBlank() && password.isBlank()) {
+            return FiberLoginResult(false, "未填写账号密码，已尝试免登录只读接口")
+        }
+        return try {
+            val headers = fiberHeaders(session.sessionId, session.token, baseUrl)
+            val payload = JSONObject()
+                .put(
+                    "dataObj",
+                    JSONObject()
+                        .put("username", username.ifBlank { "admin" })
+                        .put("password", password)
+                )
+                .put("ajaxmethod", "DO_WEB_LOGIN")
+                .put("sessionid", session.sessionId)
+                .toString()
+            val response = fiberHttp(
+                "POST",
+                "$baseUrl/api/sign/DO_WEB_LOGIN",
+                fiberEncryptHex(payload, session.sessionId),
+                headers
+            )
+            if (response.code >= 400) {
+                FiberLoginResult(false, "HTTP ${response.code}")
+            } else {
+                val decoded = fiberDecryptOrPlain(response.body, session.sessionId)
+                if (decoded.contains(Regex("fail|error|invalid|denied|password", RegexOption.IGNORE_CASE))) {
+                    FiberLoginResult(false, decoded.take(160))
+                } else {
+                    FiberLoginResult(true, "")
+                }
+            }
+        } catch (error: Exception) {
+            FiberLoginResult(false, error.message ?: error.javaClass.simpleName)
+        }
     }
 
-    private fun fiberToolApi(
+    private fun readFiberHomeToolBaseInfo(host: String, username: String = "", password: String = ""): JSONObject? {
+        val baseUrl = "http://$host"
+        val headers = mapOf(
+            "Accept" to "application/json,text/plain,*/*",
+            "Accept-Encoding" to "gzip, deflate",
+            "Accept-Language" to "zh-CN,en,*",
+            "User-Agent" to "Mozilla/5.0",
+            "Connection" to "Keep-Alive",
+            "Cache-Control" to "no-cache"
+        )
+        // 先直接读状态；只有状态接口 timeout 且用户填了密码，才低频执行本地唤醒。
+        readFiberHomeToolBaseInfoOnce(baseUrl, headers)?.let { return it }
+        if (password.isNotBlank() && reserveFiberHomeToolWake(baseUrl)) {
+            wakeFiberHomeToolApi(baseUrl, headers, username, password)
+            readFiberHomeToolBaseInfoOnce(baseUrl, headers)?.let { return it }
+        }
+        return null
+    }
+
+    private fun reserveFiberHomeToolWake(baseUrl: String): Boolean {
+        // 同一设备 10 分钟内最多唤醒一次，避免 app_do_login 被自动刷新反复调用。
+        val now = System.currentTimeMillis()
+        synchronized(fiberToolWakeTimes) {
+            val lastWake = fiberToolWakeTimes[baseUrl] ?: 0L
+            if (now - lastWake < fiberToolWakeCooldownMs) return false
+            fiberToolWakeTimes[baseUrl] = now
+            return true
+        }
+    }
+
+    private fun readFiberHomeToolBaseInfoOnce(baseUrl: String, headers: Map<String, String>): JSONObject? {
+        repeat(3) { attempt ->
+            // 烽火主状态接口；新增字段优先在 assets/app.js 的 normalizeDevicePayload 里映射。
+            val response = fiberHttp(
+                "GET",
+                "$baseUrl/api/tmp/FHTOOLAPIS?ajaxmethod=app_get_base_info",
+                null,
+                headers,
+                timeoutMillis = 1200
+            )
+            if (response.code < 400 && response.body.isNotBlank()) {
+                val body = response.body.trim()
+                if (looksLikeStatusPayload(body)) {
+                    return JSONObject()
+                        .put("ok", true)
+                        .put("vendor", "firehome")
+                        .put(
+                            "responses",
+                            JSONObject().put("FHTOOLAPIS_app_get_base_info", jsonValue(body))
+                        )
+                        .put("warning", JSONObject.NULL)
+                        .put("error", JSONObject.NULL)
+                }
+                if (!body.contains("\"timeout\"", ignoreCase = true)) return null
+            }
+            if (attempt < 2) Thread.sleep(80L)
+        }
+        return null
+    }
+
+    private fun wakeFiberHomeToolApi(
         baseUrl: String,
-        method: String,
-        session: FiberSession,
-        headers: Map<String, String>
+        headers: Map<String, String>,
+        username: String,
+        password: String
+    ) {
+        try {
+            // 参考原版启动时的本地请求顺序，但有冷却时间保护，不会每秒重复登录。
+            fiberHomeToolPost(baseUrl, headers, "app_get_login_status", JSONObject.NULL)
+            val loginUsers = listOf(username.trim().ifBlank { "admin" }, "admin").distinct()
+            val loggedIn = loginUsers.any { loginUser ->
+                val response = fiberHomeToolPost(
+                    baseUrl,
+                    headers,
+                    "app_do_login",
+                    JSONObject()
+                        .put("username", loginUser)
+                        .put("password", password)
+                )
+                isFiberHomeToolLoginOk(response.body)
+            }
+            if (!loggedIn) {
+                Log.d("CpeHidden", "tool wake login was not accepted")
+                return
+            }
+            listOf("app_get_network_info", "app_get_lockband", "app_get_cell_list").forEach { method ->
+                fiberHomeToolPost(baseUrl, headers, method, JSONObject.NULL)
+            }
+            fiberHttp(
+                "GET",
+                "$baseUrl/api/tmp/FHTOOLAPIS?ajaxmethod=app_get_airplane",
+                null,
+                headers,
+                timeoutMillis = 1200
+            )
+        } catch (error: Exception) {
+            Log.d("CpeHidden", "tool wake failed error=${error.javaClass.simpleName}")
+        }
+    }
+
+    private fun isFiberHomeToolLoginOk(body: String): Boolean {
+        val trimmed = body.trim()
+        if (trimmed.isBlank()) return false
+        return try {
+            val json = JSONObject(trimmed)
+            val timeout = json.optString("timeout").equals("true", ignoreCase = true)
+            // 烽火本地接口登录成功字段通常是 login_result=0，不能只按通用 result 判断。
+            val result = listOf("login_result", "result", "ret", "code")
+                .firstNotNullOfOrNull { key -> json.optString(key).takeIf { it.isNotBlank() } }
+            !timeout && (result == "0" || result.equals("success", ignoreCase = true))
+        } catch (_: Exception) {
+            !trimmed.contains(Regex("timeout|fail|error|password|denied", RegexOption.IGNORE_CASE))
+        }
+    }
+
+    private fun fiberHomeToolPost(
+        baseUrl: String,
+        headers: Map<String, String>,
+        ajaxMethod: String,
+        dataObj: Any
     ): FiberResponse {
+        val sessionResponse = fiberHttp(
+            "GET",
+            "$baseUrl/api/tmp/FHNCAPIS?ajaxmethod=get_refresh_sessionid",
+            null,
+            headers,
+            timeoutMillis = 1200
+        )
+        val sessionId = JSONObject(sessionResponse.body).optString("sessionid")
+        if (sessionId.isBlank()) throw IllegalStateException("empty sessionid")
         val payload = JSONObject()
-            .put("dataObj", JSONObject())
-            .put("ajaxmethod", method)
-            .put("sessionid", session.sessionId)
+            .put("dataObj", dataObj)
+            .put("ajaxmethod", ajaxMethod)
+            .put("sessionid", sessionId)
             .toString()
         return fiberHttp(
             "POST",
             "$baseUrl/api/tmp/FHTOOLAPIS",
             payload,
+            headers + mapOf("Referer" to "$baseUrl/main.html"),
+            timeoutMillis = 1200
+        )
+    }
+
+    private fun fiberStatusApi(
+        baseUrl: String,
+        apiKind: String,
+        method: String,
+        session: FiberSession,
+        headers: Map<String, String>
+    ): FiberResponse {
+        val payload = JSONObject()
+            .put("dataObj", JSONObject())
+            .put("ajaxmethod", method)
+            .put("sessionid", session.sessionId)
+            .toString()
+        val encrypted = apiKind != "FHTOOLAPIS"
+        return fiberHttp(
+            "POST",
+            "$baseUrl/api/tmp/$apiKind",
+            if (encrypted) fiberEncryptHex(payload, session.sessionId) else payload,
             headers
         )
     }
@@ -368,17 +852,29 @@ class MainActivity : ComponentActivity() {
                 ?.getOrNull(1)
                 .orEmpty()
         }
-        if (sessionId.length < 16) error("烽火会话无效")
+        val cookieSession = response.header("Set-Cookie")
+            .split(';')
+            .firstOrNull { it.trim().startsWith("sessionid=", ignoreCase = true) }
+            ?.substringAfter('=')
+            .orEmpty()
+        val effectiveSessionId = sessionId.ifBlank { cookieSession }
+        if (effectiveSessionId.length < 16) error("烽火会话无效")
         val token = response.header("WebToken").ifBlank { headers["WebToken"].orEmpty() }
-        return FiberSession(sessionId, token)
+        return FiberSession(effectiveSessionId, token)
     }
 
-    private fun fiberHeaders(sessionId: String, token: String): Map<String, String> {
+    private fun fiberHeaders(
+        sessionId: String,
+        token: String,
+        baseUrl: String = "http://192.168.8.1"
+    ): Map<String, String> {
         return buildMap {
             put("Accept", "application/json,text/plain,*/*")
             put("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8")
             put("User-Agent", mobileChromeUserAgent)
             put("X-Requested-With", "XMLHttpRequest")
+            put("Origin", baseUrl)
+            put("Referer", "$baseUrl/")
             put("WebSession", sessionId)
             put("Cookie", "sessionid=$sessionId")
             if (token.isNotBlank()) put("WebToken", token)
@@ -389,20 +885,25 @@ class MainActivity : ComponentActivity() {
         method: String,
         address: String,
         requestBody: String?,
-        headers: Map<String, String>
+        headers: Map<String, String>,
+        timeoutMillis: Int = 3500
     ): FiberResponse {
         var connection: HttpURLConnection? = null
         return try {
             connection = (URL(address).openConnection() as HttpURLConnection).apply {
-                connectTimeout = 5500
-                readTimeout = 5500
+                connectTimeout = timeoutMillis
+                readTimeout = timeoutMillis
                 requestMethod = method
                 useCaches = false
                 headers.forEach { (key, value) -> setRequestProperty(key, value) }
                 if (method == "POST") {
                     val bytes = requestBody.orEmpty().toByteArray(StandardCharsets.UTF_8)
                     doOutput = true
-                    setRequestProperty("Content-Type", "application/json; charset=utf-8")
+                    val looksEncrypted = requestBody.orEmpty().matches(Regex("[0-9a-fA-F]+"))
+                    setRequestProperty(
+                        "Content-Type",
+                        if (looksEncrypted) "text/plain; charset=utf-8" else "application/json; charset=utf-8"
+                    )
                     outputStream.use { output -> output.write(bytes) }
                 }
             }
@@ -459,7 +960,7 @@ class MainActivity : ComponentActivity() {
     private fun looksLikeStatusPayload(value: String): Boolean {
         return value.contains(
             Regex(
-                "rsrp|rsrq|sinr|arfcn|earfcn|pci|cell|band|device|model|traffic|flow|wan|lte|nr|5g|imei|imsi|temperature|temp|version|signal|rate|tx|rx",
+                "rsrp|rsrq|sinr|arfcn|earfcn|pci|cell|band|device|model|operator_name|product|lan_port|i18n|traffic|flow|wan|lte|nr|5g|imei|imsi|temperature|temp|version|signal|rate|tx|rx",
                 RegexOption.IGNORE_CASE
             )
         )
@@ -488,6 +989,8 @@ class MainActivity : ComponentActivity() {
         val expiresAt: Long
     )
 
+    private data class FiberLoginResult(val ok: Boolean, val error: String)
+
     private data class FiberResponse(
         val code: Int,
         val body: String,
@@ -509,20 +1012,37 @@ class MainActivity : ComponentActivity() {
         "get_system_status",
         "get_network_status",
         "get_network_info",
+        "get_wan_state",
         "get_mobile_network_status",
+        "get_mobile_network_info",
+        "get_main_status",
+        "get_main_info",
         "get_radio_status",
         "get_cell_info",
+        "get_cell_status",
+        "get_serving_cell",
+        "get_neighbor_cell",
+        "get_neighbor_cells",
         "get_nr_status",
+        "get_nr_info",
         "get_lte_status",
+        "get_lte_info",
         "get_signal_status",
+        "get_signal_info",
         "get_modem_status",
+        "get_modem_info",
         "get_wan_status",
         "get_wan_info",
         "get_statistics",
         "get_traffic_status",
         "get_flow_statistics",
         "get_sim_status",
-        "get_current_network"
+        "get_current_network",
+        "get_traffic_info",
+        "get_device_base_info",
+        "get_network_type",
+        "get_lte_multi_ca_info",
+        "get_nr_multi_ca_info"
     )
 
     private val fiberIv = ByteArray(16) { index -> (index + 112).toByte() }
@@ -763,6 +1283,34 @@ class MainActivity : ComponentActivity() {
         } catch (error: Exception) {
             "{\"error\":${quote(error.message ?: error.javaClass.simpleName)}}"
         }
+    }
+
+    private fun readWifiGatewayJson(): String {
+        return try {
+            val wifi = applicationContext.getSystemService(WifiManager::class.java)
+            val dhcp = wifi.dhcpInfo
+            val gateway = ipv4FromLittleEndian(dhcp.gateway)
+            val info = wifi.connectionInfo
+            JSONObject()
+                .put("ok", gateway != "0.0.0.0")
+                .put("gateway", gateway)
+                .put("ssid", info.ssid?.trim('"') ?: "")
+                .toString()
+        } catch (error: Exception) {
+            JSONObject()
+                .put("ok", false)
+                .put("error", error.message ?: error.javaClass.simpleName)
+                .toString()
+        }
+    }
+
+    private fun ipv4FromLittleEndian(value: Int): String {
+        return listOf(
+            value and 255,
+            value shr 8 and 255,
+            value shr 16 and 255,
+            value shr 24 and 255
+        ).joinToString(".")
     }
 
     private fun phoneCellJson(cell: PhoneCell): String {

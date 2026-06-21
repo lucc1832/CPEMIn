@@ -1,23 +1,25 @@
 const $ = selector => document.querySelector(selector);
 const $$ = selector => Array.from(document.querySelectorAll(selector));
 
+// 页面里反复用到的提示文字集中放在这里，后面想改文案先改这一块。
 const text = {
-  ready: "\u51c6\u5907\u5c31\u7eea\u3002",
-  localStarted: "\u5df2\u542f\u52a8\uff0c\u7b49\u5f85\u8fde\u63a5\u771f\u5b9e\u8bbe\u5907\u3002",
-  saved: "\u8bbe\u7f6e\u5df2\u4fdd\u5b58\u3002",
-  refreshed: "\u72b6\u6001\u5df2\u5237\u65b0\u3002",
-  loggedIn: "\u6d4b\u8bd5\u8fde\u63a5\u5df2\u5b8c\u6210\u3002",
-  loggedOut: "\u5df2\u9000\u51fa\u3002",
-  reboot: "\u91cd\u542f\u6307\u4ee4\u5df2\u8bb0\u5f55\u3002",
-  airplaneOn: "\u98de\u884c\u6a21\u5f0f\u5df2\u542f\u7528\u3002",
-  airplaneOff: "\u98de\u884c\u6a21\u5f0f\u5df2\u5173\u95ed\u3002",
-  directOk: "\u5df2\u4ece\u70fd\u706b\u540e\u53f0\u8bfb\u53d6\u72b6\u6001\u3002",
-  directFail: "\u70fd\u706b\u540e\u53f0\u76f4\u8fde\u5931\u8d25\uff0c\u53ef\u80fd\u662f\u63a5\u53e3\u8def\u5f84\u4e0d\u5bf9\u6216\u624b\u673a\u6d4f\u89c8\u5668\u8de8\u57df\u9650\u5236\u3002",
-  proxyFail: "\u7535\u8111\u4ee3\u7406\u4e0d\u53ef\u7528\uff0c\u8bf7\u5148\u542f\u52a8\u672c\u5730\u670d\u52a1\u3002",
-  probeStart: "\u6b63\u5728\u63a2\u6d4b\u70fd\u706b\u540e\u53f0\u63a5\u53e3\u3002",
-  probeNone: "\u6ca1\u6709\u627e\u5230\u660e\u663e\u7684\u72b6\u6001\u63a5\u53e3\uff0c\u9700\u8981\u770b\u540e\u53f0\u7f51\u9875\u7684\u8bf7\u6c42\u8bb0\u5f55\u3002",
-  phoneNoNative: "\u5f53\u524d\u4e0d\u662f APK \u73af\u5883\uff0c\u65e0\u6cd5\u8bfb\u53d6\u624b\u673a\u81ea\u8eab\u4fe1\u53f7\u3002",
-  phoneReading: "\u6b63\u5728\u8bfb\u53d6\u624b\u673a\u4fe1\u53f7\u3002",
+  ready: "准备就绪。",
+  localStarted: "已启动，等待连接真实设备。",
+  saved: "设置已保存。",
+  cleared: "设置输入框已清空。",
+  refreshed: "状态已刷新。",
+  loggedIn: "测试连接已完成。",
+  loggedOut: "已退出。",
+  reboot: "重启指令已记录。",
+  airplaneOn: "飞行模式已启用。",
+  airplaneOff: "飞行模式已关闭。",
+  directOk: "已从烽火后台读取状态。",
+  directFail: "烽火后台直连失败，可能是接口路径不对或手机浏览器跨域限制。",
+  proxyFail: "电脑代理不可用，请先启动本地服务。",
+  probeStart: "正在探测烽火后台接口。",
+  probeNone: "没有找到明显的状态接口，需要看后台网页的请求记录。",
+  phoneNoNative: "当前不是 APK 环境，无法读取手机自身信号。",
+  phoneReading: "正在读取手机信号。",
 };
 
 const vendorLabel = {
@@ -28,7 +30,7 @@ const vendorLabel = {
 };
 
 const protocolLabel = {
-  "firehome-api": "\u70fd\u706b\u52a0\u5bc6 API",
+  "firehome-api": "\u70fd\u706b\u672c\u5730\u63a5\u53e3",
   "firehome-http": "\u70fd\u706b HTTP \u540e\u53f0",
   proxy: "\u7535\u8111\u4ee3\u7406",
 };
@@ -37,7 +39,21 @@ let currentState = null;
 let currentSettings = null;
 let refreshTimer = null;
 let phoneRefreshTimer = null;
+let refreshInFlight = false;
+let phoneRefreshInFlight = false;
+let settingsDirty = false;
 let deferredInstallPrompt = null;
+
+const STORE_SCHEMA_VERSION = 11;
+// 输入这个临时口令后展开高级设置；保存时不会把 1832 当成真实登录用户名。
+const DEV_UNLOCK_CODE = "1832";
+// 原版 3.8.1 大约 1 秒读取一次烽火本地状态；不要设得太快，避免触发设备账号保护。
+const DEFAULT_FIREHOME_REFRESH_SECONDS = 1;
+const DEFAULT_PHONE_REFRESH_SECONDS = 1;
+const MIN_REFRESH_SECONDS = 1;
+const MAX_REFRESH_SECONDS = 60;
+const defaultDeviceHosts = ["192.168.8.1", "192.168.1.1", "192.168.0.1", "192.168.31.1"];
+const emulatorGatewayHosts = ["10.0.2.2", "10.0.3.2", "10.0.2.15"];
 
 const fallbackState = {
   connected: false,
@@ -82,16 +98,17 @@ const fallbackState = {
 };
 
 const fallbackSettings = {
-  host: "192.168.8.1",
+  host: detectGatewayHost() || "192.168.8.1",
   port: 80,
   username: "admin",
   password: "",
   vendor: "firehome",
   protocol: "firehome-api",
-  statusPath: "/api/status",
+  statusPath: "GET /api/tmp/FHTOOLAPIS?ajaxmethod=app_get_base_info",
   loginPath: "/",
-  autoRefresh: false,
-  refreshInterval: 3,
+  autoRefresh: true,
+  refreshInterval: DEFAULT_FIREHOME_REFRESH_SECONDS,
+  phoneRefreshInterval: DEFAULT_PHONE_REFRESH_SECONDS,
   lockBands: [],
 };
 
@@ -100,6 +117,7 @@ const fallbackLogs = [
 ];
 
 const probePaths = [
+  "GET /api/tmp/FHTOOLAPIS?ajaxmethod=app_get_base_info",
   "GET /api/tmp/FHNCAPIS?ajaxmethod=get_refresh_sessionid",
   "GET /api/status",
   "GET /api/device/status",
@@ -120,20 +138,101 @@ function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+function detectGatewayHost() {
+  const gateway = nativeGatewayHost();
+  if (!gateway) return "";
+  if (emulatorGatewayHosts.includes(gateway)) return "";
+  return gateway;
+}
+
+function nativeGatewayHost() {
+  if (!window.CpeNative?.getWifiGateway) return "";
+  try {
+    const payload = JSON.parse(window.CpeNative.getWifiGateway());
+    if (!payload.ok || !payload.gateway) return "";
+    return payload.gateway;
+  } catch {
+    return "";
+  }
+}
+
+function isAndroidEmulatorNetwork() {
+  return emulatorGatewayHosts.includes(nativeGatewayHost());
+}
+
+// Kotlin 原生层异步读取烽火接口后，会通过这个回调把结果送回页面。
+const fiberHomeCallbacks = new Map();
+
+window.__cpeNativeFiberHomeResult = (token, body) => {
+  const pending = fiberHomeCallbacks.get(token);
+  if (!pending) return;
+  clearTimeout(pending.timeoutId);
+  fiberHomeCallbacks.delete(token);
+  pending.resolve(body);
+};
+
+function nativeFiberHomeStatus(hostAndPort, username, password) {
+  if (window.CpeNative?.fiberHomeStatusAsync) {
+    return new Promise((resolve, reject) => {
+      const token = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      const timeoutId = setTimeout(() => {
+        fiberHomeCallbacks.delete(token);
+        reject(new Error("\u70fd\u706b API \u8bfb\u53d6\u8d85\u65f6"));
+      }, 90000);
+      fiberHomeCallbacks.set(token, { resolve, reject, timeoutId });
+      try {
+        const accepted = window.CpeNative.fiberHomeStatusAsync(token, hostAndPort, username, password);
+        const parsed = accepted ? JSON.parse(accepted) : { ok: true };
+        if (parsed.ok === false) throw new Error(parsed.error || "\u70fd\u706b API \u542f\u52a8\u5931\u8d25");
+      } catch (error) {
+        clearTimeout(timeoutId);
+        fiberHomeCallbacks.delete(token);
+        reject(error);
+      }
+    });
+  }
+  if (window.CpeNative?.fiberHomeStatus) {
+    return Promise.resolve(window.CpeNative.fiberHomeStatus(hostAndPort, username, password));
+  }
+  return Promise.reject(new Error("\u5f53\u524d\u73af\u5883\u4e0d\u652f\u6301\u70fd\u706b\u52a0\u5bc6 API\u3002"));
+}
+
 function migrateSavedStore(saved) {
   if (!saved) return saved;
+  const oldSchema = Number(saved.schemaVersion || 0);
   saved.settings = { ...fallbackSettings, ...saved.settings };
   if (saved.settings.protocol === "demo") saved.settings.protocol = "firehome-api";
+  if (oldSchema < STORE_SCHEMA_VERSION) {
+    if (typeof saved.settings.autoRefresh !== "boolean") saved.settings.autoRefresh = true;
+    const oldFireHomeRefresh = normalizeNumber(saved.settings.refreshInterval);
+    const oldPhoneRefresh = normalizeNumber(saved.settings.phoneRefreshInterval);
+    saved.settings.refreshInterval = oldSchema < 11 && (!oldFireHomeRefresh || oldFireHomeRefresh < 1 || oldFireHomeRefresh === 0.5)
+      ? DEFAULT_FIREHOME_REFRESH_SECONDS
+      : normalizeRefreshSeconds(saved.settings.refreshInterval, DEFAULT_FIREHOME_REFRESH_SECONDS);
+    saved.settings.phoneRefreshInterval = oldSchema < 11 && (!oldPhoneRefresh || oldPhoneRefresh < 1 || oldPhoneRefresh === 0.5)
+      ? DEFAULT_PHONE_REFRESH_SECONDS
+      : normalizeRefreshSeconds(saved.settings.phoneRefreshInterval, DEFAULT_PHONE_REFRESH_SECONDS);
+    if (!saved.settings.statusPath || saved.settings.statusPath === "/api/status") {
+      saved.settings.statusPath = fallbackSettings.statusPath;
+    }
+    if (!saved.settings.username) saved.settings.username = "admin";
+  }
   saved.state = clone(fallbackState);
   saved.logs = Array.isArray(saved.logs) ? saved.logs : clone(fallbackLogs);
-  saved.schemaVersion = 5;
+  saved.schemaVersion = STORE_SCHEMA_VERSION;
 
-  if (saved.settings.host === "192.168.1.1") saved.settings.host = fallbackSettings.host;
+  const gatewayHost = detectGatewayHost();
+  if (emulatorGatewayHosts.includes(saved.settings.host)) {
+    saved.settings.host = gatewayHost || fallbackSettings.host;
+  } else if (gatewayHost && !saved.settings.host) {
+    saved.settings.host = gatewayHost;
+  }
   if (saved.settings.lockBands?.includes("N78")) saved.settings.lockBands = [];
 
   return saved;
 }
 
+// 本地存储保存用户设置和最后一次状态，APK 里没有后端服务时也能工作。
 function localStore() {
   const saved = JSON.parse(localStorage.getItem("local-cpe-manager") || "null");
   if (saved) {
@@ -141,7 +240,7 @@ function localStore() {
     localStorage.setItem("local-cpe-manager", JSON.stringify(migrated));
     return migrated;
   }
-  const fresh = { schemaVersion: 5, state: clone(fallbackState), settings: clone(fallbackSettings), logs: clone(fallbackLogs) };
+  const fresh = { schemaVersion: STORE_SCHEMA_VERSION, state: clone(fallbackState), settings: clone(fallbackSettings), logs: clone(fallbackLogs) };
   localStorage.setItem("local-cpe-manager", JSON.stringify(fresh));
   return fresh;
 }
@@ -156,6 +255,7 @@ function addLocalLog(store, message) {
 }
 
 async function api(path, options = {}) {
+  if (location.protocol === "file:") return localApi(path, options);
   try {
     const response = await fetch(path, {
       headers: { "Content-Type": "application/json" },
@@ -226,11 +326,75 @@ function fixedValue(value, digits, suffix = "") {
   return hasNumber(value) ? `${value.toFixed(digits)}${suffix}` : "--";
 }
 
+function secondsFromInput(id, fallback) {
+  const field = $(`#${id}`);
+  return normalizeRefreshSeconds(field?.value, fallback);
+}
+
+function normalizeRefreshSeconds(value, fallback) {
+  const number = normalizeNumber(value);
+  const safeFallback = Number.isFinite(Number(fallback)) ? Number(fallback) : 1;
+  const selected = Number.isFinite(number) ? number : safeFallback;
+  return Math.max(MIN_REFRESH_SECONDS, Math.min(MAX_REFRESH_SECONDS, selected));
+}
+
+function rateKbpsFromByteWindow(value, seconds) {
+  const bytes = normalizeNumber(value);
+  const interval = normalizeNumber(seconds);
+  if (!hasNumber(bytes) || !hasNumber(interval) || interval <= 0) return undefined;
+  if (bytes < 0 || bytes > 512 * 1024 * 1024) return undefined;
+  return (bytes * 8) / 1000 / interval;
+}
+
+function speedKbpsFromBytesPerSecond(value) {
+  const bytesPerSecond = normalizeNumber(value);
+  if (!hasNumber(bytesPerSecond)) return undefined;
+  return (bytesPerSecond * 8) / 1000;
+}
+
+function bytesToGb(value) {
+  const bytes = normalizeNumber(value);
+  if (!hasNumber(bytes)) return undefined;
+  return bytes / 1024 / 1024 / 1024;
+}
+
+function normalizeTemperature(value) {
+  const temperature = normalizeNumber(value);
+  if (!hasNumber(temperature)) return undefined;
+  if (temperature > 1000) return Math.round(temperature / 1000);
+  if (temperature > 100) return Math.round(temperature / 10);
+  return Math.round(temperature);
+}
+
+function trafficAmount(valueGb) {
+  if (!hasNumber(valueGb)) return "--";
+  if (valueGb < 1) return `${(valueGb * 1024).toFixed(2)}MB`;
+  return `${valueGb.toFixed(2)}GB`;
+}
+
 function firstValue(source, keys) {
   for (const key of keys) {
     if (source[key] !== undefined && source[key] !== null && source[key] !== "") return source[key];
   }
   return undefined;
+}
+
+function carrierNameFromPlmn(value) {
+  const plmn = String(value || "").trim();
+  if (["46000", "46002", "46004", "46007", "46008", "46013"].includes(plmn)) return "\u79fb\u52a8";
+  if (["46001", "46006", "46009"].includes(plmn)) return "\u8054\u901a";
+  if (["46003", "46005", "46011", "46012"].includes(plmn)) return "\u7535\u4fe1";
+  if (["46015"].includes(plmn)) return "\u5e7f\u7535";
+  return "";
+}
+
+function formatCellId(value) {
+  const text = String(value || "").trim();
+  const number = Number(text);
+  if (!Number.isFinite(number) || number <= 4096) return text;
+  const high = Math.floor(number / 4096);
+  const low = number % 4096;
+  return `${high}/${low}`;
 }
 
 function deepSignalSource(value, output = {}, depth = 0) {
@@ -254,6 +418,7 @@ function deepSignalSource(value, output = {}, depth = 0) {
   return output;
 }
 
+// 把烽火接口、通用接口、手机接口返回的不同字段名统一映射成页面使用的字段。
 function normalizeDevicePayload(raw, baseState) {
   const root = raw && typeof raw === "object" ? raw : {};
   const src = { ...deepSignalSource(root), ...(root.data || root.result || root.status || root) };
@@ -261,23 +426,78 @@ function normalizeDevicePayload(raw, baseState) {
 
   state.connected = true;
   state.vendor = currentSettings?.vendor || "firehome";
-  state.operator = firstValue(src, ["operator", "isp", "network_operator", "plmn_name"]) || state.operator;
-  state.mode = firstValue(src, ["mode", "networkMode", "network_mode", "rat"]) || state.mode;
-  state.model = firstValue(src, ["model", "product_model", "device_model"]) || state.model;
-  state.version = firstValue(src, ["version", "softwareVersion", "sw_version", "firmware"]) || state.version;
-  state.temperature = normalizeNumber(firstValue(src, ["temperature", "temp", "device_temp"])) ?? state.temperature;
-  state.band = firstValue(src, ["band", "nr_band", "Band"]) || state.band;
-  state.arfcn = normalizeNumber(firstValue(src, ["arfcn", "earfcn", "nr_arfcn", "NR_ARFCN"])) ?? state.arfcn;
-  state.pci = normalizeNumber(firstValue(src, ["pci", "nr_pci", "PCI"])) ?? state.pci;
+  state.operator = carrierNameFromPlmn(firstValue(src, ["PLMN", "plmn"])) ||
+    firstValue(src, ["operator", "operator_name", "isp", "network_operator", "plmn_name"]) ||
+    state.operator;
+  state.mode = firstValue(src, ["mode", "networkMode", "network_mode", "rat", "WorkMode"]) || state.mode;
+  state.model = firstValue(src, ["model", "modelName", "model_name", "product_model", "device_model", "ProductClass", "product_class"]) || state.model;
+  state.version = firstValue(src, [
+    "version",
+    "Software_version",
+    "softwareVersion",
+    "sw_version",
+    "firmware",
+    "SoftwareVersion",
+    "IGDSoftwareVersion",
+    "ProductSoftwareVersion",
+    "HardwareVersion",
+  ]) || state.version;
+  state.temperature = normalizeTemperature(firstValue(src, [
+    "temperature",
+    "temp",
+    "device_temp",
+    "Temperature",
+    "DeviceTemperature",
+    "DeviceTemperature2",
+    "FHDeviceTemperature",
+    "IGDTemperature",
+  ])) ?? state.temperature;
+  state.downContract = normalizeNumber(firstValue(src, ["downContract", "DL_AMBR", "dl_ambr"])) ?? state.downContract;
+  state.upContract = normalizeNumber(firstValue(src, ["upContract", "UL_AMBR", "ul_ambr"])) ?? state.upContract;
+  if (state.downContract > 10000) state.downContract = Math.round(state.downContract / 1024);
+  if (state.upContract > 10000) state.upContract = Math.round(state.upContract / 1024);
+  state.qci = firstValue(src, ["qci", "QCI", "NR_QCI"]) || state.qci;
+  const bandValue = firstValue(src, ["band", "nr_band", "Band", "BAND_NBR", "NR_BAND", "NR_Band"]);
+  state.band = bandValue && /^\d+$/.test(String(bandValue)) ? `N${bandValue}` : (bandValue || state.band);
+  state.arfcn = normalizeNumber(firstValue(src, ["arfcn", "earfcn", "nr_arfcn", "NR_ARFCN", "EARFCN_NBR"])) ?? state.arfcn;
+  state.pci = normalizeNumber(firstValue(src, ["pci", "nr_pci", "PCI", "PCI_NBR", "NR_PCI"])) ?? state.pci;
   state.tac = String(firstValue(src, ["tac", "TAC"]) || state.tac);
-  state.gCellId = String(firstValue(src, ["gCellId", "gcellid", "cell_id", "nr_cell_id"]) || state.gCellId);
+  state.gCellId = formatCellId(firstValue(src, ["gCellId", "gcellid", "cell_id", "nr_cell_id", "NCGI", "ECGI"]) || state.gCellId);
 
-  state.metrics.nrRsrp = normalizeNumber(firstValue(src, ["nrRsrp", "nr_rsrp", "rsrp", "NR_RSRP", "RSRP"])) ?? state.metrics.nrRsrp;
-  state.metrics.nrRsrq = normalizeNumber(firstValue(src, ["nrRsrq", "nr_rsrq", "rsrq", "NR_RSRQ", "RSRQ"])) ?? state.metrics.nrRsrq;
-  state.metrics.nrSinr = normalizeNumber(firstValue(src, ["nrSinr", "nr_sinr", "sinr", "NR_SINR", "SINR"])) ?? state.metrics.nrSinr;
-  state.metrics.nrDlbw = normalizeNumber(firstValue(src, ["nrDlbw", "dlbw", "dl_bw", "NR_DLBW"])) ?? state.metrics.nrDlbw;
-  state.metrics.nrUlbw = normalizeNumber(firstValue(src, ["nrUlbw", "ulbw", "ul_bw", "NR_ULBW"])) ?? state.metrics.nrUlbw;
-  state.metrics.nrCqi = normalizeNumber(firstValue(src, ["nrCqi", "cqi", "NR_CQI"])) ?? state.metrics.nrCqi;
+  state.metrics.nrRsrp = normalizeNumber(firstValue(src, ["nrRsrp", "nr_rsrp", "SSB_RSRP", "RSRP_NBR", "NR_RSRP", "rsrp", "RSRP"])) ?? state.metrics.nrRsrp;
+  state.metrics.nrRsrq = normalizeNumber(firstValue(src, ["nrRsrq", "nr_rsrq", "SSB_RSRQ", "RSRQ_NBR", "NR_RSRQ", "rsrq", "RSRQ"])) ?? state.metrics.nrRsrq;
+  state.metrics.nrSinr = normalizeNumber(firstValue(src, ["nrSinr", "nr_sinr", "SSB_SINR", "SINR_NBR", "NR_SINR", "sinr", "SINR"])) ?? state.metrics.nrSinr;
+  state.metrics.nrDlbw = normalizeNumber(firstValue(src, ["nrDlbw", "dlbw", "dl_bw", "DlBandWidth", "DLBandwidth", "NR_DLBW", "NR_DL_BW"])) ?? state.metrics.nrDlbw;
+  state.metrics.nrUlbw = normalizeNumber(firstValue(src, ["nrUlbw", "ulbw", "ul_bw", "UlBandWidth", "ULBandwidth", "NR_ULBW", "NR_UL_BW"])) ?? state.metrics.nrUlbw;
+  state.metrics.nrCqi = normalizeNumber(firstValue(src, ["nrCqi", "cqi", "CQI", "NR_CQI", "LTE_CQI"])) ?? state.metrics.nrCqi;
+  state.metrics.pusch = normalizeNumber(firstValue(src, ["pusch", "PUSCH", "PUSCH_TX_Power", "NR_Power", "LTE_Power"])) ?? state.metrics.pusch;
+  state.metrics.pucch = normalizeNumber(firstValue(src, ["pucch", "PUCCH", "PUCCH_TX_Power"])) ?? state.metrics.pucch;
+  state.metrics.nrDlMcs = normalizeNumber(firstValue(src, ["nrDlMcs", "dl_mcs", "DlMCS", "NR_DLMCS", "NR_DL_MCS"])) ?? state.metrics.nrDlMcs;
+  state.metrics.nrUlMcs = normalizeNumber(firstValue(src, ["nrUlMcs", "ul_mcs", "UlMCS", "NR_ULMCS", "NR_UL_MCS"])) ?? state.metrics.nrUlMcs;
+  state.metrics.mimoDl = firstValue(src, ["mimoDl", "DlMimo", "NR_MIMO_DL", "MIMO_DL"]) || state.metrics.mimoDl;
+  state.metrics.mimoUl = firstValue(src, ["mimoUl", "UlMimo", "NR_MIMO_UL", "MIMO_UL"]) || state.metrics.mimoUl;
+
+  const refreshSeconds = normalizeRefreshSeconds(currentSettings?.refreshInterval, fallbackSettings.refreshInterval);
+  state.traffic.downloadRateKbps = normalizeNumber(firstValue(src, ["downloadRateKbps", "DownloadRate", "download_rate"])) ??
+    speedKbpsFromBytesPerSecond(firstValue(src, ["RxSpeed", "rxSpeed"])) ??
+    rateKbpsFromByteWindow(firstValue(src, ["TotalBytesReceived", "totalBytesReceived", "rxBytes", "RxBytes"]), refreshSeconds) ??
+    state.traffic.downloadRateKbps;
+  state.traffic.uploadRateKbps = normalizeNumber(firstValue(src, ["uploadRateKbps", "UploadRate", "upload_rate"])) ??
+    speedKbpsFromBytesPerSecond(firstValue(src, ["TxSpeed", "txSpeed"])) ??
+    rateKbpsFromByteWindow(firstValue(src, ["TotalBytesSent", "totalBytesSent", "txBytes", "TxBytes"]), refreshSeconds) ??
+    state.traffic.uploadRateKbps;
+  state.traffic.todayDownloadGb = normalizeNumber(firstValue(src, ["todayDownloadGb", "TodayDownload", "today_download"])) ??
+    bytesToGb(firstValue(src, ["todayRxBytes", "todayDownloadBytes"])) ??
+    state.traffic.todayDownloadGb;
+  state.traffic.todayUploadGb = normalizeNumber(firstValue(src, ["todayUploadGb", "TodayUpload", "today_upload"])) ??
+    bytesToGb(firstValue(src, ["todayTxBytes", "todayUploadBytes"])) ??
+    state.traffic.todayUploadGb;
+  state.traffic.monthDownloadGb = normalizeNumber(firstValue(src, ["monthDownloadGb", "MonthDownload", "month_download"])) ??
+    bytesToGb(firstValue(src, ["monthRxBytes", "monthDownloadBytes"])) ??
+    state.traffic.monthDownloadGb;
+  state.traffic.monthUploadGb = normalizeNumber(firstValue(src, ["monthUploadGb", "MonthUpload", "month_upload"])) ??
+    bytesToGb(firstValue(src, ["monthTxBytes", "monthUploadBytes"])) ??
+    state.traffic.monthUploadGb;
 
   const rawCells = firstValue(src, ["cells", "neighborCells", "ncell_list", "neighbors", "cellList"]);
   if (Array.isArray(rawCells) && rawCells.length) {
@@ -289,6 +509,15 @@ function normalizeDevicePayload(raw, baseState) {
       rsrq: normalizeNumber(firstValue(cell, ["rsrq", "RSRQ", "nr_rsrq"])) ?? -20,
       sinr: normalizeNumber(firstValue(cell, ["sinr", "SINR", "nr_sinr"])) ?? 0,
     }));
+  } else if (firstValue(src, ["BAND_NBR", "EARFCN_NBR", "PCI_NBR", "RSRP_NBR", "SINR_NBR"])) {
+    state.cells = [{
+      band: String(firstValue(src, ["BAND_NBR"]) || state.band),
+      earfcn: normalizeNumber(firstValue(src, ["EARFCN_NBR"])) ?? state.arfcn,
+      pci: String(firstValue(src, ["PCI_NBR"]) || state.pci),
+      rsrp: normalizeNumber(firstValue(src, ["RSRP_NBR", "SSB_RSRP"])) ?? state.metrics.nrRsrp,
+      rsrq: normalizeNumber(firstValue(src, ["SSB_RSRQ", "RSRQ_NBR", "RSRQ"])) ?? state.metrics.nrRsrq,
+      sinr: normalizeNumber(firstValue(src, ["SINR_NBR", "SSB_SINR"])) ?? state.metrics.nrSinr,
+    }];
   }
 
   return state;
@@ -298,6 +527,28 @@ function cleanPath(path) {
   if (!path) return "/";
   if (/^https?:\/\//i.test(path)) return path;
   return path.startsWith("/") ? path : `/${path}`;
+}
+
+// 设置页的“登录IP/URL”允许填 IP、IP:端口 或完整 URL，这里统一拆成 host/port。
+function parseHostInput(rawValue, fallbackPort = 80) {
+  const raw = String(rawValue || "").trim();
+  const fallbackHost = detectGatewayHost() || fallbackSettings.host;
+  if (!raw) return { host: fallbackHost, port: fallbackPort };
+  const withScheme = /^https?:\/\//i.test(raw) ? raw : `http://${raw}`;
+  try {
+    const url = new URL(withScheme);
+    return {
+      host: url.hostname || fallbackHost,
+      port: Number(url.port || fallbackPort || 80),
+    };
+  } catch {
+    const hostAndPort = raw.replace(/^https?:\/\//i, "").split("/")[0];
+    const [host, port] = hostAndPort.split(":");
+    return {
+      host: host || fallbackHost,
+      port: Number(port || fallbackPort || 80),
+    };
+  }
 }
 
 function buildDeviceUrl(settings, path) {
@@ -340,17 +591,67 @@ async function fetchDirectDevice(payload) {
 
 async function fetchFiberHomeDevice(payload) {
   const settings = payload.settings;
-  if (!window.CpeNative?.fiberHomeStatus) {
+  if (isAndroidEmulatorNetwork()) {
+    try {
+      return await fetchFiberHomeHostProxy(payload);
+    } catch (error) {
+      console.warn("Host proxy unavailable, falling back to direct device access.", error);
+    }
+  }
+
+  // 主读取路径：优先走烽火本地 FHTOOLAPIS，速度快，也避免依赖云端。
+  if (!window.CpeNative?.fiberHomeStatus && !window.CpeNative?.fiberHomeStatusAsync) {
     throw new Error("\u5f53\u524d\u73af\u5883\u4e0d\u652f\u6301\u70fd\u706b\u52a0\u5bc6 API\u3002");
   }
-  const body = window.CpeNative.fiberHomeStatus(
-    `${settings.host}:${Number(settings.port || 80)}`,
-    settings.username || "admin",
-    settings.password || ""
-  );
-  const parsed = JSON.parse(body);
-  if (!parsed.ok) throw new Error(parsed.error || "\u70fd\u706b API \u8bfb\u53d6\u5931\u8d25");
-  return { state: normalizeDevicePayload(parsed, payload.state), settings };
+  const gatewayHost = detectGatewayHost();
+  const preferredHost = settings.host || gatewayHost || fallbackSettings.host;
+  const hostCandidates = Array.from(new Set([preferredHost].filter(Boolean)));
+  let lastError = "";
+
+  for (const host of hostCandidates) {
+    // 账号密码只在本地接口 timeout 时用于低频唤醒，不跟着每秒刷新反复登录。
+    const body = await nativeFiberHomeStatus(
+      `${host}:${Number(settings.port || 80)}`,
+      settings.username || "admin",
+      settings.password || ""
+    );
+    const parsed = JSON.parse(body);
+    if (parsed.ok) {
+      const nextSettings = { ...settings, host };
+      if (!settings.host && host !== settings.host) {
+        const store = localStore();
+        store.settings = { ...store.settings, host };
+        saveLocalStore(store);
+      }
+      return { state: normalizeDevicePayload(parsed, payload.state), settings: nextSettings };
+    }
+    lastError = parsed.error || "\u70fd\u706b API \u8bfb\u53d6\u5931\u8d25";
+  }
+
+  throw new Error(lastError || "\u70fd\u706b API \u8bfb\u53d6\u5931\u8d25");
+}
+
+async function fetchFiberHomeHostProxy(payload) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 8000);
+  try {
+    const response = await fetch("http://10.0.2.2:8787/api/fiberhome/status", {
+      method: "POST",
+      cache: "no-store",
+      signal: controller.signal,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload.settings),
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const parsed = await response.json();
+    if (!parsed.ok) throw new Error(parsed.error || "\u7535\u8111\u4ee3\u7406\u8bfb\u53d6\u5931\u8d25");
+    return {
+      state: normalizeDevicePayload(parsed, payload.state),
+      settings: { ...payload.settings, host: parsed.host || payload.settings.host },
+    };
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 async function fetchDeviceText(settings, rawPath) {
@@ -455,7 +756,7 @@ function renderPhoneSignals(payload) {
       <div class="table-wrap phone-table-wrap">
         <table class="phone-table">
           <thead>
-            <tr><th>ARFCN</th><th>PCI</th><th>RSRP</th><th>RSRQ</th><th>Name</th></tr>
+            <tr><th>ARFCN</th><th>PCI</th><th>RSRP</th><th>RSRQ</th><th>SINR</th><th>Name</th></tr>
           </thead>
           <tbody>
             ${(group.cells || []).map(cell => `
@@ -464,9 +765,10 @@ function renderPhoneSignals(payload) {
                 <td>${phoneValue(cell.pci)}</td>
                 <td>${phoneMetric(cell.rsrp, "rsrp")}</td>
                 <td>${phoneMetric(cell.rsrq, "rsrq")}</td>
+                <td>${phoneMetric(cell.sinr, "sinr")}</td>
                 <td>${phoneValue(cell.name || cell.type)}</td>
               </tr>
-            `).join("") || `<tr><td colspan="5">\u6682\u672a\u8bfb\u5230\u5c0f\u533a\u4fe1\u606f</td></tr>`}
+            `).join("") || `<tr><td colspan="6">\u6682\u672a\u8bfb\u5230\u5c0f\u533a\u4fe1\u606f</td></tr>`}
           </tbody>
         </table>
       </div>
@@ -531,7 +833,7 @@ async function maybeReadRealDevice(payload) {
   if (payload.settings.protocol === "firehome-api") {
     try {
       const real = await fetchFiberHomeDevice(payload);
-      setMessage("\u767b\u5f55\u6210\u529f\uff01\u5382\u5bb6\uff1a\u70fd\u706b\u3002");
+      setMessage(`\u767b\u5f55\u6210\u529f\uff01\u5382\u5bb6\uff1a\u70fd\u706b\uff0c\u5730\u5740\uff1a${real.settings.host}:${real.settings.port}\u3002`);
       return real;
     } catch (error) {
       setMessage(`\u70fd\u706b API \u8fde\u63a5\u5931\u8d25\uff1a${error.message}`);
@@ -607,6 +909,7 @@ function mini(value, type, min, max, suffix = "") {
   return `<div class="mini-meter" style="--fill:${fill}%;--color:${color}">${value}${suffix}</div>`;
 }
 
+// 根据当前页面状态刷新 UI；这里不直接请求网络，只负责把 state 画出来。
 function renderStatus(payload) {
   currentState = payload.state;
   currentSettings = payload.settings;
@@ -643,32 +946,36 @@ function renderStatus(payload) {
 
   $("#downloadRate").textContent = fixedValue(t.downloadRateKbps, 2, "Kbps");
   $("#uploadRate").textContent = fixedValue(t.uploadRateKbps, 2, "Kbps");
-  $("#todayDownload").textContent = fixedValue(t.todayDownloadGb, 2, "GB");
-  $("#todayUpload").textContent = fixedValue(t.todayUploadGb, 2, "GB");
-  $("#monthDownload").textContent = fixedValue(t.monthDownloadGb, 2, "GB");
-  $("#monthUpload").textContent = fixedValue(t.monthUploadGb, 2, "GB");
+  $("#todayDownload").textContent = trafficAmount(t.todayDownloadGb);
+  $("#todayUpload").textContent = trafficAmount(t.todayUploadGb);
+  $("#monthDownload").textContent = trafficAmount(t.monthDownloadGb);
+  $("#monthUpload").textContent = trafficAmount(t.monthUploadGb);
 
   $("#airplaneToggle").checked = s.airplaneMode;
   $("#autoRefresh").checked = Boolean(currentSettings.autoRefresh);
   if ($("#targetDevice")) $("#targetDevice").textContent = `${currentSettings.host}:${currentSettings.port}`;
-  $("#dataMode").textContent = protocolLabel[currentSettings.protocol] || currentSettings.protocol;
+  if ($("#dataMode")) $("#dataMode").textContent = protocolLabel[currentSettings.protocol] || currentSettings.protocol;
   if ($("#phoneMode")) $("#phoneMode").textContent = currentSettings.protocol === "firehome-http" ? "\u624b\u673a\u76f4\u8fde" : protocolLabel[currentSettings.protocol];
 
-  const settingValues = {
-    settingHost: currentSettings.host,
-    settingPort: currentSettings.port,
-    settingUser: currentSettings.username,
-    settingPass: currentSettings.password,
-    settingVendor: currentSettings.vendor,
-    settingProtocol: currentSettings.protocol === "demo" ? "firehome-api" : currentSettings.protocol,
-    statusPath: currentSettings.statusPath,
-    loginPath: currentSettings.loginPath,
-    refreshInterval: currentSettings.refreshInterval,
-  };
-  Object.entries(settingValues).forEach(([id, value]) => {
-    const field = $(`#${id}`);
-    if (field) field.value = value;
-  });
+  if (!isEditingSettings()) {
+    const settingValues = {
+      settingHost: currentSettings.host,
+      settingPort: currentSettings.port,
+      settingUser: currentSettings.username,
+      settingPass: currentSettings.password,
+      settingVendor: currentSettings.vendor,
+      settingProtocol: currentSettings.protocol === "demo" ? "firehome-api" : currentSettings.protocol,
+      statusPath: currentSettings.statusPath,
+      loginPath: currentSettings.loginPath,
+      refreshInterval: currentSettings.refreshInterval,
+      phoneRefreshInterval: currentSettings.phoneRefreshInterval,
+    };
+    Object.entries(settingValues).forEach(([id, value]) => {
+      const field = $(`#${id}`);
+      if (field) field.value = value;
+    });
+    updateDeveloperMode();
+  }
   $$("#bandSelect option").forEach(option => {
     option.selected = currentSettings.lockBands?.includes(option.value);
   });
@@ -704,40 +1011,101 @@ async function renderLogs() {
 }
 
 function collectSettings() {
+  const hostInput = parseHostInput($("#settingHost").value, Number($("#settingPort")?.value || currentSettings?.port || 80));
+  const enteredUsername = $("#settingUser").value.trim();
+  const developerMode = enteredUsername === DEV_UNLOCK_CODE;
   return {
-    host: $("#settingHost").value.trim() || "192.168.8.1",
-    port: Number($("#settingPort").value || 80),
-    username: $("#settingUser").value.trim(),
+    host: hostInput.host,
+    port: hostInput.port,
+    username: developerMode ? (currentSettings?.username || fallbackSettings.username) : enteredUsername,
     password: $("#settingPass").value,
-    vendor: $("#settingVendor").value,
-    protocol: $("#settingProtocol").value,
-    statusPath: $("#statusPath").value.trim() || "/api/status",
-    loginPath: $("#loginPath").value.trim() || "/",
-    refreshInterval: Math.max(1, Number($("#refreshInterval")?.value || 3)),
+    vendor: $("#settingVendor")?.value || fallbackSettings.vendor,
+    protocol: $("#settingProtocol")?.value || fallbackSettings.protocol,
+    statusPath: $("#statusPath")?.value.trim() || fallbackSettings.statusPath,
+    loginPath: $("#loginPath")?.value.trim() || "/",
+    refreshInterval: secondsFromInput("refreshInterval", DEFAULT_FIREHOME_REFRESH_SECONDS),
+    phoneRefreshInterval: secondsFromInput("phoneRefreshInterval", DEFAULT_PHONE_REFRESH_SECONDS),
     autoRefresh: $("#autoRefresh").checked,
   };
+}
+
+// 输入开发者口令时展开高级设置；普通用户只看到截图里的三行登录配置。
+function updateDeveloperMode() {
+  const enabled = $("#settingUser")?.value.trim() === DEV_UNLOCK_CODE;
+  document.body.classList.toggle("developer-mode", enabled);
 }
 
 async function saveSettings() {
   const settings = collectSettings();
   await api("/api/settings", { method: "POST", body: JSON.stringify(settings) });
+  settingsDirty = false;
   setMessage(text.saved);
   await refresh();
   await renderLogs();
   scheduleRefresh();
+  schedulePhoneRefresh($(".tab.active")?.dataset.tab === "phone");
+}
+
+async function testConnection() {
+  const settings = collectSettings();
+  await api("/api/login", { method: "POST", body: JSON.stringify(settings) });
+  settingsDirty = false;
+  await refresh();
+  setMessage($("#messageLine").textContent);
+  await renderLogs();
+  scheduleRefresh();
+  schedulePhoneRefresh($(".tab.active")?.dataset.tab === "phone");
+}
+
+function clearSettingsForm() {
+  $("#settingHost").value = "";
+  $("#settingUser").value = "";
+  $("#settingPass").value = "";
+  settingsDirty = true;
+  updateDeveloperMode();
+  setMessage(text.cleared);
 }
 
 function scheduleRefresh() {
   clearInterval(refreshTimer);
   if (!currentSettings?.autoRefresh) return;
-  const seconds = Math.max(1, Number(currentSettings.refreshInterval || 3));
-  refreshTimer = setInterval(refresh, seconds * 1000);
+  const seconds = normalizeRefreshSeconds(currentSettings.refreshInterval, DEFAULT_FIREHOME_REFRESH_SECONDS);
+  const tick = async () => {
+    if (refreshInFlight) return;
+    refreshInFlight = true;
+    try {
+      await refresh();
+    } finally {
+      refreshInFlight = false;
+    }
+  };
+  // 防止上一次请求没结束又发下一次；默认按原版 1 秒节奏刷新。
+  refreshTimer = setInterval(tick, seconds * 1000);
+  setTimeout(tick, 0);
 }
 
 function schedulePhoneRefresh(active) {
   clearInterval(phoneRefreshTimer);
   if (!active) return;
-  phoneRefreshTimer = setInterval(refreshPhoneSignals, 1000);
+  const seconds = normalizeRefreshSeconds(currentSettings?.phoneRefreshInterval, DEFAULT_PHONE_REFRESH_SECONDS);
+  const tick = async () => {
+    if (phoneRefreshInFlight) return;
+    phoneRefreshInFlight = true;
+    try {
+      await refreshPhoneSignals();
+    } finally {
+      phoneRefreshInFlight = false;
+    }
+  };
+  // 手机信号只在“手机”页打开时刷新，减少权限读取和耗电。
+  phoneRefreshTimer = setInterval(tick, seconds * 1000);
+  setTimeout(tick, 0);
+}
+
+function isEditingSettings() {
+  const panel = $("#panel-settings");
+  if (!panel?.classList.contains("active")) return false;
+  return settingsDirty || panel.contains(document.activeElement);
 }
 
 function bindTabs() {
@@ -761,14 +1129,9 @@ function bindActions() {
 
   $("#saveSettingsTop").addEventListener("click", saveSettings);
   $("#saveSettings").addEventListener("click", saveSettings);
+  $("#clearSettings").addEventListener("click", clearSettingsForm);
 
-  $("#loginDevice").addEventListener("click", async () => {
-    const settings = collectSettings();
-    await api("/api/login", { method: "POST", body: JSON.stringify(settings) });
-    await refresh();
-    setMessage($("#messageLine").textContent);
-    await renderLogs();
-  });
+  $("#loginDevice").addEventListener("click", testConnection);
 
   $("#probeDevice").addEventListener("click", probeDevice);
   $("#openBackendPage").addEventListener("click", openBackendPage);
@@ -797,6 +1160,15 @@ function bindActions() {
   });
 
   $("#autoRefresh").addEventListener("change", saveSettings);
+
+  $("#panel-settings").addEventListener("input", () => {
+    settingsDirty = true;
+    updateDeveloperMode();
+  });
+  $("#panel-settings").addEventListener("change", () => {
+    settingsDirty = true;
+    updateDeveloperMode();
+  });
 
   $("#applyLock").addEventListener("click", async () => {
     const lockBands = $$("#bandSelect option").filter(option => option.selected).map(option => option.value);
@@ -843,6 +1215,11 @@ async function start() {
   await refresh();
   await renderLogs();
   scheduleRefresh();
+  if (new URLSearchParams(location.search).has("autotest")) {
+    setTimeout(() => {
+      testConnection().catch(error => setMessage(error.message));
+    }, 600);
+  }
 }
 
 start();

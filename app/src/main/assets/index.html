@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="#191b29">
-    <title>CPEManager</title>
+    <title>CPEManager 本地自用版</title>
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="stylesheet" href="./styles.css">
 </head>
@@ -12,7 +12,7 @@
 <div class="app-shell">
     <header class="topbar">
         <div>
-            <h1>CPEManager 3.8.1&#65288;&#26410;&#25480;&#26435;&#65289;</h1>
+            <h1>CPEManager 3.8.1（本地自用版）</h1>
             <div class="subline" id="deviceHeadline">&#26412;&#22320;&#27169;&#24335;</div>
         </div>
         <div class="top-actions">
@@ -23,16 +23,15 @@
     </header>
 
     <nav class="tabs" aria-label="tabs">
-        <button class="tab" data-tab="logs">&#26085;&#24535;</button>
-        <button class="tab" data-tab="settings">&#35774;&#32622;</button>
-        <button class="tab" data-tab="account">&#36134;&#21495;</button>
-        <button class="tab" data-tab="plugins">&#25554;&#20214;</button>
-        <button class="tab" data-tab="phone">&#25163;&#26426;</button>
-        <button class="tab active" data-tab="firefly">&#28925;&#28779;</button>
+        <button class="tab active" data-tab="settings">设置</button>
+        <button class="tab" data-tab="logs">日志</button>
+        <button class="tab" data-tab="plugins">插件</button>
+        <button class="tab" data-tab="phone">手机</button>
+        <button class="tab" data-tab="firefly">烽火</button>
     </nav>
 
     <main class="workspace">
-        <section class="panel tab-panel active" id="panel-firefly">
+        <section class="panel tab-panel" id="panel-firefly">
             <div class="device-strip">
                 <div class="network-line"><span id="operatorName">&#31227;&#21160;</span> <span
                         id="networkMode">SA</span> &uarr;&darr;
@@ -129,7 +128,7 @@
             </div>
 
             <div class="inline-control">
-                <label>&#39134;&#34892;&#27169;&#24335;&#65306;</label>
+                <label for="airplaneToggle">&#39134;&#34892;&#27169;&#24335;&#65306;</label>
                 <input type="checkbox" id="airplaneToggle">
                 <span>&#21551;&#29992;</span>
             </div>
@@ -167,49 +166,59 @@
             <div class="log-list" id="logList"></div>
         </section>
 
-        <section class="panel tab-panel" id="panel-settings">
-            <div class="form-grid">
-                <label><span>&#35774;&#22791;&#22320;&#22336;</span><input id="settingHost"
-                                                                           placeholder="192.168.8.1"></label>
-                <label><span>&#31471;&#21475;</span><input id="settingPort" inputmode="numeric"
-                                                           placeholder="80"></label>
-                <label><span>&#29992;&#25143;&#21517;</span><input id="settingUser"
-                                                                   autocomplete="username"></label>
-                <label><span>&#23494;&#30721;</span><input id="settingPass" type="password"
-                                                           autocomplete="current-password"></label>
-                <label><span>&#21378;&#23478;</span><select id="settingVendor">
-                    <option value="firehome">&#28925;&#28779;</option>
-                    <option value="huawei">&#21326;&#20026;</option>
-                    <option value="zte">&#20013;&#20852;</option>
-                    <option value="generic">&#36890;&#29992;</option>
-                </select></label>
-                <label><span>&#36830;&#25509;&#26041;&#24335;</span><select id="settingProtocol">
-                    <option value="firehome-api">&#28925;&#28779;&#21152;&#23494; API</option>
-                    <option value="firehome-http">&#28925;&#28779; HTTP &#21518;&#21488;</option>
-                    <option value="proxy">&#30005;&#33041;&#20195;&#29702;</option>
-                </select></label>
-                <label><span>&#29366;&#24577;&#25509;&#21475;&#36335;&#24452;</span><input
-                        id="statusPath" placeholder="/api/status"></label>
-                <label><span>&#30331;&#24405;&#25509;&#21475;&#36335;&#24452;</span><input
-                        id="loginPath" placeholder="/"></label>
-            </div>
-            <div class="button-row">
-                <button id="saveSettings">&#20445;&#23384;&#35774;&#32622;</button>
-                <button id="loginDevice">&#27979;&#35797;&#36830;&#25509;</button>
-                <button id="probeDevice">&#25506;&#27979;&#25509;&#21475;</button>
-                <button id="openBackendPage">&#30495;&#23454;&#21518;&#21488;&#32593;&#39029;
-                </button>
-            </div>
-        </section>
+        <section class="panel tab-panel active" id="panel-settings">
+            <div class="settings-card">
+                <h2>烽火</h2>
+                <div class="settings-simple">
+                    <label class="settings-row">
+                        <span>登录IP/URL</span>
+                        <input id="settingHost" autocomplete="off" placeholder="192.168.8.1">
+                    </label>
+                    <label class="settings-row">
+                        <span>登录用户名</span>
+                        <input id="settingUser" autocomplete="username" placeholder="admin">
+                    </label>
+                    <label class="settings-row">
+                        <span>登录密码</span>
+                        <input id="settingPass" type="password" autocomplete="current-password" placeholder="可留空">
+                    </label>
+                </div>
 
-        <section class="panel tab-panel" id="panel-account">
-            <div class="status-grid">
-                <div><strong>&#36134;&#21495;&#29366;&#24577;</strong><span>&#26412;&#22320;&#27491;&#24120;</span>
+                <div id="developerSettings" class="developer-settings developer-only">
+                    <div class="developer-title">开发者设置</div>
+                    <div class="form-grid">
+                        <label><span>端口</span><input id="settingPort" inputmode="numeric" placeholder="80"></label>
+                        <label><span>厂家</span><select id="settingVendor">
+                            <option value="firehome">烽火</option>
+                            <option value="huawei">华为</option>
+                            <option value="zte">中兴</option>
+                            <option value="generic">通用</option>
+                        </select></label>
+                        <label><span>连接方式</span><select id="settingProtocol">
+                            <option value="firehome-api">烽火本地接口</option>
+                            <option value="firehome-http">烽火 HTTP 后台</option>
+                            <option value="proxy">电脑代理</option>
+                        </select></label>
+                        <label><span>烽火刷新秒数</span><input
+                                id="refreshInterval" inputmode="numeric" type="number" min="1" max="60" step="1"
+                                placeholder="1"></label>
+                        <label><span>手机刷新秒数</span><input
+                                id="phoneRefreshInterval" inputmode="numeric" type="number" min="1" max="60" step="1"
+                                placeholder="1"></label>
+                        <label><span>登录接口路径</span><input id="loginPath" placeholder="/"></label>
+                        <label class="wide"><span>状态接口路径</span><input
+                                id="statusPath" placeholder="GET /api/tmp/FHTOOLAPIS?ajaxmethod=app_get_base_info"></label>
+                    </div>
+                    <div class="button-row developer-actions">
+                        <button id="loginDevice">测试连接</button>
+                        <button id="probeDevice">探测接口</button>
+                        <button id="openBackendPage">真实后台网页</button>
+                    </div>
                 </div>
-                <div><strong>&#25480;&#26435;&#27169;&#24335;</strong><span>&#29420;&#31435;&#26412;&#22320;&#24037;&#20855;</span>
-                </div>
-                <div><strong>&#25968;&#25454;&#26469;&#28304;</strong><span id="dataMode">&#26412;&#22320;&#27169;&#25311;</span>
-                </div>
+            </div>
+            <div class="button-row settings-actions">
+                <button id="saveSettings">保存</button>
+                <button id="clearSettings">清空</button>
             </div>
         </section>
 

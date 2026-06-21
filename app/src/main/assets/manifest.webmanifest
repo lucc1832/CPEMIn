@@ -1,7 +1,7 @@
 {
-  "name": "Local CPE Mobile",
-  "short_name": "CPE Mobile",
-  "description": "Local mobile CPE manager",
+  "name": "CPE管理器本地版",
+  "short_name": "CPE管理器",
+  "description": "本地自用 CPE 管理工具",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
