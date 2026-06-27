@@ -1,3 +1,12 @@
 <resources>
     <string name="app_name">CPE管理器</string>
+    <string name="err_permission_required">需要授予定位和电话权限后才能读取手机信号</string>
+    <string name="err_fh_timeout">烽火本地接口暂时 timeout，正在等待设备返回数据</string>
+    <string name="err_fh_no_api">已连到设备，但未匹配到当前固件的只读状态接口</string>
+    <string name="err_fh_no_credentials">未填写账号密码，已尝试免登录只读接口</string>
+    <string name="err_fh_session_fail">获取烽火会话失败：HTTP %1$d</string>
+    <string name="err_fh_session_invalid">烽火会话无效</string>
+    <string name="err_device_host_blank">设备地址不能为空</string>
+    <string name="unknown">未知</string>
+    <string name="login_hint_suffix">；登录提示：%1$s</string>
 </resources>
