@@ -23,16 +23,16 @@ const text = {
 };
 
 const vendorLabel = {
-  firehome: "\u70fd\u706b",
-  huawei: "\u534e\u4e3a",
-  zte: "\u4e2d\u5174",
-  generic: "\u901a\u7528",
+  firehome: "烽火",
+  huawei: "华为",
+  zte: "中兴",
+  generic: "通用",
 };
 
 const protocolLabel = {
-  "firehome-api": "\u70fd\u706b\u672c\u5730\u63a5\u53e3",
-  "firehome-http": "\u70fd\u706b HTTP \u540e\u53f0",
-  proxy: "\u7535\u8111\u4ee3\u7406",
+  "firehome-api": "烽火本地接口",
+  "firehome-http": "烽火 HTTP 后台",
+  proxy: "电脑代理",
 };
 
 let currentState = null;
@@ -177,13 +177,13 @@ function nativeFiberHomeStatus(hostAndPort, username, password) {
       const token = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
       const timeoutId = setTimeout(() => {
         fiberHomeCallbacks.delete(token);
-        reject(new Error("\u70fd\u706b API \u8bfb\u53d6\u8d85\u65f6"));
+        reject(new Error("烽火 API 读取超时"));
       }, 90000);
       fiberHomeCallbacks.set(token, { resolve, reject, timeoutId });
       try {
         const accepted = window.CpeNative.fiberHomeStatusAsync(token, hostAndPort, username, password);
         const parsed = accepted ? JSON.parse(accepted) : { ok: true };
-        if (parsed.ok === false) throw new Error(parsed.error || "\u70fd\u706b API \u542f\u52a8\u5931\u8d25");
+        if (parsed.ok === false) throw new Error(parsed.error || "烽火 API 启动失败");
       } catch (error) {
         clearTimeout(timeoutId);
         fiberHomeCallbacks.delete(token);
@@ -194,7 +194,7 @@ function nativeFiberHomeStatus(hostAndPort, username, password) {
   if (window.CpeNative?.fiberHomeStatus) {
     return Promise.resolve(window.CpeNative.fiberHomeStatus(hostAndPort, username, password));
   }
-  return Promise.reject(new Error("\u5f53\u524d\u73af\u5883\u4e0d\u652f\u6301\u70fd\u706b\u52a0\u5bc6 API\u3002"));
+  return Promise.reject(new Error("当前环境不支持烽火加密 API。"));
 }
 
 function migrateSavedStore(saved) {
@@ -280,19 +280,19 @@ async function localApi(path, options = {}) {
   if (path === "/api/logs" && method === "GET") return { logs: store.logs };
   if (path === "/api/settings" && method === "POST") {
     store.settings = { ...store.settings, ...body };
-    addLocalLog(store, `\u8bbe\u7f6e\u5df2\u4fdd\u5b58\uff1a${store.settings.host}:${store.settings.port}\u3002`);
+    addLocalLog(store, `设置已保存：${store.settings.host}:${store.settings.port}。`);
   }
   if (path === "/api/login" && method === "POST") {
     store.settings = { ...store.settings, ...body };
     store.state.vendor = store.settings.vendor;
-    addLocalLog(store, `\u8fde\u63a5\u6d4b\u8bd5\uff1a${vendorLabel[store.settings.vendor] || store.settings.vendor} ${store.settings.host}:${store.settings.port}\u3002`);
+    addLocalLog(store, `连接测试：${vendorLabel[store.settings.vendor] || store.settings.vendor} ${store.settings.host}:${store.settings.port}。`);
   }
   if (path === "/api/logout" && method === "POST") {
     store.state.connected = false;
-    addLocalLog(store, "\u5df2\u9000\u51fa\u672c\u5730\u8fde\u63a5\u3002");
+    addLocalLog(store, "已退出本地连接。");
   }
   if (path === "/api/reboot" && method === "POST") {
-    addLocalLog(store, "\u5df2\u8bb0\u5f55\u91cd\u542f\u6307\u4ee4\u3002");
+    addLocalLog(store, "已记录重启指令。");
   }
   if (path === "/api/airplane" && method === "POST") {
     store.state.airplaneMode = Boolean(body.enabled);
@@ -300,7 +300,7 @@ async function localApi(path, options = {}) {
   }
   if (path === "/api/lock" && method === "POST") {
     store.settings.lockBands = Array.isArray(body.lockBands) ? body.lockBands : store.settings.lockBands;
-    addLocalLog(store, `\u9501\u9891\u914d\u7f6e\u5df2\u66f4\u65b0\uff1a${store.settings.lockBands.join(", ") || "\u672a\u9009\u62e9"}\u3002`);
+    addLocalLog(store, `锁频配置已更新：${store.settings.lockBands.join(", ") || "未选择"}。`);
   }
 
   saveLocalStore(store);
@@ -416,10 +416,10 @@ function displayCellPci(value) {
 
 function carrierNameFromPlmn(value) {
   const plmn = String(value || "").trim();
-  if (["46000", "46002", "46004", "46007", "46008", "46013"].includes(plmn)) return "\u79fb\u52a8";
-  if (["46001", "46006", "46009"].includes(plmn)) return "\u8054\u901a";
-  if (["46003", "46005", "46011", "46012"].includes(plmn)) return "\u7535\u4fe1";
-  if (["46015"].includes(plmn)) return "\u5e7f\u7535";
+  if (["46000", "46002", "46004", "46007", "46008", "46013"].includes(plmn)) return "移动";
+  if (["46001", "46006", "46009"].includes(plmn)) return "联通";
+  if (["46003", "46005", "46011", "46012"].includes(plmn)) return "电信";
+  if (["46015"].includes(plmn)) return "广电";
   return "";
 }
 
@@ -643,7 +643,7 @@ async function fetchFiberHomeDevice(payload) {
 
   // 主读取路径：优先走烽火本地 FHTOOLAPIS，速度快，也避免依赖云端。
   if (!window.CpeNative?.fiberHomeStatus && !window.CpeNative?.fiberHomeStatusAsync) {
-    throw new Error("\u5f53\u524d\u73af\u5883\u4e0d\u652f\u6301\u70fd\u706b\u52a0\u5bc6 API\u3002");
+    throw new Error("当前环境不支持烽火加密 API。");
   }
   const gatewayHost = detectGatewayHost();
   const preferredHost = settings.host || gatewayHost || fallbackSettings.host;
@@ -667,10 +667,10 @@ async function fetchFiberHomeDevice(payload) {
       }
       return { state: normalizeDevicePayload(parsed, payload.state), settings: nextSettings };
     }
-    lastError = parsed.error || "\u70fd\u706b API \u8bfb\u53d6\u5931\u8d25";
+    lastError = parsed.error || "烽火 API 读取失败";
   }
 
-  throw new Error(lastError || "\u70fd\u706b API \u8bfb\u53d6\u5931\u8d25");
+  throw new Error(lastError || "烽火 API 读取失败");
 }
 
 async function fetchFiberHomeHostProxy(payload) {
@@ -686,7 +686,7 @@ async function fetchFiberHomeHostProxy(payload) {
     });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const parsed = await response.json();
-    if (!parsed.ok) throw new Error(parsed.error || "\u7535\u8111\u4ee3\u7406\u8bfb\u53d6\u5931\u8d25");
+    if (!parsed.ok) throw new Error(parsed.error || "电脑代理读取失败");
     return {
       state: normalizeDevicePayload(parsed, payload.state),
       settings: { ...payload.settings, host: parsed.host || payload.settings.host },
@@ -736,7 +736,7 @@ async function probeDevice() {
       if (!looksLikeSignalPayload(body)) continue;
       $("#statusPath").value = rawPath;
       await saveSettings();
-      setMessage(`\u627e\u5230\u7591\u4f3c\u72b6\u6001\u63a5\u53e3\uff1a${rawPath}`);
+      setMessage(`找到疑似状态接口：${rawPath}`);
       return;
     } catch {
       // Keep trying the next candidate path.
@@ -864,7 +864,7 @@ function renderWifiTable(rows) {
       <td>${escapeRawHtml(row.beamforming || row.b || "")}</td>
       <td>${escapeRawHtml(row.roaming || row.r || "")}</td>
     </tr>
-  `).join("") : `<tr><td colspan="11">\u6682\u672a\u8bfb\u5230 WLAN \u626b\u63cf\u5217\u8868</td></tr>`;
+  `).join("") : `<tr><td colspan="11">暂未读到 WLAN 扫描列表</td></tr>`;
 }
 
 function graphPoint(row, range) {
@@ -923,7 +923,7 @@ function renderPhoneSignals(payload) {
     return;
   }
 
-  message.textContent = "\u624b\u673a\u4fe1\u53f7\u5df2\u5237\u65b0\u3002";
+  message.textContent = "手机信号已刷新。";
   const groups = Array.isArray(payload.cellular) ? payload.cellular : [];
   $("#phoneCellularCards").innerHTML = groups.length ? groups.map(group => `
     <section class="phone-card">
@@ -949,12 +949,12 @@ function renderPhoneSignals(payload) {
                 <td>${phoneMetric(cell.sinr, "sinr")}</td>
                 <td>${escapeHtml(cell.name || cell.type)}</td>
               </tr>
-            `).join("") || `<tr><td colspan="6">\u6682\u672a\u8bfb\u5230\u5c0f\u533a\u4fe1\u606f</td></tr>`}
+            `).join("") || `<tr><td colspan="6">暂未读到小区信息</td></tr>`}
           </tbody>
         </table>
       </div>
     </section>
-  `).join("") : `<div class="phone-empty">\u6682\u672a\u8bfb\u5230\u8702\u7a9d\u5c0f\u533a\u4fe1\u606f\u3002</div>`;
+  `).join("") : `<div class="phone-empty">暂未读到蜂窝小区信息。</div>`;
 
   renderWifiPanel(payload.wifi || {});
 }
@@ -1011,10 +1011,10 @@ async function maybeReadRealDevice(payload) {
   if (payload.settings.protocol === "firehome-api") {
     try {
       const real = await fetchFiberHomeDevice(payload);
-      setMessage(`\u767b\u5f55\u6210\u529f\uff01\u5382\u5bb6\uff1a\u70fd\u706b\uff0c\u5730\u5740\uff1a${real.settings.host}:${real.settings.port}\u3002`);
+      setMessage(`登录成功！厂家：烽火，地址：${real.settings.host}:${real.settings.port}。`);
       return real;
     } catch (error) {
-      setMessage(`\u70fd\u706b API \u8fde\u63a5\u5931\u8d25\uff1a${error.message}`);
+      setMessage(`烽火 API 连接失败：${error.message}`);
       return payload;
     }
   }
@@ -1153,24 +1153,24 @@ function renderStatus(payload) {
   const temperatureFill = percent(s.temperature, 20, 70);
   const temperatureColor = colorForTemperature(s.temperature);
 
-  $("#deviceHeadline").textContent = `${vendor} - ${s.model} - ${s.connected ? "\u5df2\u8fde\u63a5" : "\u672a\u8fde\u63a5"}`;
+  $("#deviceHeadline").textContent = `${vendor} - ${s.model} - ${s.connected ? "已连接" : "未连接"}`;
   $("#operatorName").textContent = s.operator;
   $("#networkMode").textContent = s.mode;
-  setText("#refreshBadge", currentSettings.autoRefresh ? `${refreshSeconds}\u79d2` : "\u624b\u52a8");
+  setText("#refreshBadge", currentSettings.autoRefresh ? `${refreshSeconds}秒` : "手动");
   $("#modelValue").textContent = s.model;
   $("#versionValue").textContent = s.version;
-  $("#contractLine").textContent = `${displayValue(s.downContract, "Mbps")} \u2193 ${displayValue(s.upContract, "Mbps")} \u2191 QCI:${displayValue(s.qci)}`;
+  $("#contractLine").textContent = `${displayValue(s.downContract, "Mbps")} ↓ ${displayValue(s.upContract, "Mbps")} ↑ QCI:${displayValue(s.qci)}`;
   $("#bandValue").textContent = formatBandList(s.band);
   $("#arfcnValue").textContent = s.arfcn;
   $("#pciValue").textContent = s.pci;
   $("#tacValue").textContent = s.tac;
   $("#gcellValue").textContent = s.gCellId;
   $("#temperatureBar").style.background = `linear-gradient(90deg, ${temperatureColor} 0 ${temperatureFill}%, transparent ${temperatureFill}%), #f7fbfb`;
-  $("#temperatureBar span").textContent = displayValue(s.temperature, "\u00b0C");
+  $("#temperatureBar span").textContent = displayValue(s.temperature, "°C");
 
   setText("#primarySinr", displayValue(m.nrSinr, "dB"));
   setText("#primaryRsrp", displayValue(m.nrRsrp, "dBm"));
-  setText("#primaryTemp", displayValue(s.temperature, "\u00b0C"));
+  setText("#primaryTemp", displayValue(s.temperature, "°C"));
   setText("#primaryDown", speedLabel(t.downloadRateKbps));
   setText("#primaryUp", speedLabel(t.uploadRateKbps));
   setText("#primaryBand", formatBandList(s.band));
@@ -1207,7 +1207,7 @@ function renderStatus(payload) {
   $("#autoRefresh").checked = Boolean(currentSettings.autoRefresh);
   if ($("#targetDevice")) $("#targetDevice").textContent = `${currentSettings.host}:${currentSettings.port}`;
   if ($("#dataMode")) $("#dataMode").textContent = protocolLabel[currentSettings.protocol] || currentSettings.protocol;
-  if ($("#phoneMode")) $("#phoneMode").textContent = currentSettings.protocol === "firehome-http" ? "\u624b\u673a\u76f4\u8fde" : protocolLabel[currentSettings.protocol];
+  if ($("#phoneMode")) $("#phoneMode").textContent = currentSettings.protocol === "firehome-http" ? "手机直连" : protocolLabel[currentSettings.protocol];
 
   if (!isEditingSettings()) {
     const settingValues = {
@@ -1242,16 +1242,42 @@ function renderStatus(payload) {
       <td>${mini(cell.rsrq, "rsrq", -30, -5)}</td>
       <td>${mini(cell.sinr, "sinr", -20, 30)}</td>
     </tr>
-  `).join("") : `<tr><td></td><td colspan="6">\u6682\u65e0\u771f\u5b9e\u8bbe\u5907\u6570\u636e</td></tr>`;
+  `).join("") : `<tr><td></td><td colspan="6">暂无真实设备数据</td></tr>`;
+}
+
+function persistLastStatus(payload) {
+  if (!payload?.state || !payload?.settings) return;
+  try {
+    const store = localStore();
+    store.state = payload.state;
+    store.settings = { ...store.settings, ...payload.settings };
+    saveLocalStore(store);
+  } catch {
+    // 保存上次状态只是为了 timeout 时兜底，失败不影响实时读取。
+  }
+}
+
+function isTimeoutError(error) {
+  return /timeout|超时/i.test(String(error?.message || error || ""));
 }
 
 async function refresh() {
+  let cachedPayload = null;
   try {
-    let payload = await api("/api/status");
+    cachedPayload = await api("/api/status");
+    let payload = cachedPayload;
     payload = await maybeReadRealDevice(payload);
+    persistLastStatus(payload);
     renderStatus(payload);
   } catch (error) {
-    setMessage(error.message);
+    const settings = currentSettings || cachedPayload?.settings || localStore().settings || fallbackSettings;
+    const target = `${settings.host}:${settings.port}`;
+    if (isTimeoutError(error)) {
+      if (!currentState && cachedPayload?.state) renderStatus(cachedPayload);
+      setMessage(`本次本地接口超时，已保留上次数据：${target}。`);
+      return;
+    }
+    setMessage(`连接失败：${error.message}（${target}）。`);
   }
 }
 
@@ -1433,7 +1459,7 @@ function bindActions() {
   $("#applyLock").addEventListener("click", async () => {
     const lockBands = $$("#bandSelect option").filter(option => option.selected).map(option => option.value);
     await api("/api/lock", { method: "POST", body: JSON.stringify({ lockBands }) });
-    setMessage(`\u9501\u9891\u914d\u7f6e\u5df2\u66f4\u65b0\uff1a${lockBands.join(", ") || "\u672a\u9009\u62e9"}\u3002`);
+    setMessage(`锁频配置已更新：${lockBands.join(", ") || "未选择"}。`);
     await refresh();
     await renderLogs();
   });
@@ -1446,7 +1472,7 @@ function bindActions() {
 
   $("#installApp").addEventListener("click", async () => {
     if (!deferredInstallPrompt) {
-      setMessage("\u8bf7\u5728\u624b\u673a\u6d4f\u89c8\u5668\u83dc\u5355\u91cc\u9009\u62e9\u201c\u6dfb\u52a0\u5230\u4e3b\u5c4f\u5e55\u201d\u3002");
+      setMessage("请在手机浏览器菜单里选择“添加到主屏幕”。");
       return;
     }
     deferredInstallPrompt.prompt();

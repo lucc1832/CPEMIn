@@ -14,6 +14,37 @@
   --blue: #05a6de;
   --cyan: #05a6de;
   --red: #c7463b;
+191b29;
+  --panel: #3c3c3c;
+  --panel-deep: #2e2e2e;
+  --panel-soft: #444;
+  --line: #171717;
+  --line-light: #626262;
+  --ink: #e4e5ed;
+  --muted: #c9cad2;
+  --green: #35a248;
+  --green-dark: #35a248;
+  --yellow: #ffd52f;
+  --orange: #f08b2f;
+  --blue: #05a6de;
+  --cyan: #05a6de;
+  --red: #c7463b;
+  --font-title: 26px;
+  --font-tab: 27px;
+  --font-section: 21px;
+  --font-body: 20px;
+  --font-control: 18px;
+  --font-small: 16px;
+  --font-micro: 14px;
+  --font-value: 28px;
+  --font-value-large: 31px;
+  --font-icon: 30px;
+  --font-table: 20px;
+  --font-table-dense: 18px;
+  --font-button: 27px;
+  --font-message: 25px;
+  --font-dialog-title: 34px;
+  --font-dialog-body: 28px;
 }
 
 * { box-sizing: border-box; }
@@ -63,7 +94,7 @@ select {
 
 h1 {
   margin: 0;
-  font-size: 26px;
+  font-size: var(--font-title);
   font-weight: 400;
   line-height: 1.1;
 }
@@ -97,7 +128,7 @@ h1 {
 
 .tab {
   padding: 4px 5px;
-  font-size: 27px;
+  font-size: var(--font-tab);
   line-height: 1.15;
   white-space: nowrap;
 }
@@ -150,7 +181,7 @@ h1 {
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
-  font-size: 24px;
+  font-size: var(--font-section);
   font-weight: 400;
   overflow-wrap: anywhere;
 }
@@ -163,14 +194,14 @@ h1 {
   border: 1px solid #666;
   background: #242424;
   color: var(--muted);
-  font-size: 18px;
+  font-size: var(--font-control);
   white-space: nowrap;
 }
 
 .power-glyph {
   color: var(--yellow);
   font-family: sans-serif;
-  font-size: 30px;
+  font-size: var(--font-icon);
   text-align: center;
   text-shadow: 0 1px #111;
 }
@@ -215,13 +246,13 @@ h1 {
 
 .metric-tile span {
   color: var(--muted);
-  font-size: 17px;
+  font-size: var(--font-small);
 }
 
 .metric-tile strong {
   margin-top: 4px;
   color: var(--ink);
-  font-size: 28px;
+  font-size: var(--font-button);
   font-weight: 400;
   line-height: 1.05;
 }
@@ -229,7 +260,7 @@ h1 {
 .metric-tile em {
   margin-top: 5px;
   color: var(--muted);
-  font-size: 15px;
+  font-size: var(--font-small);
   font-style: normal;
   line-height: 1.15;
 }
@@ -239,7 +270,7 @@ h1 {
   background: #343434;
 }
 
-.signal-tile strong { font-size: 31px; }
+.signal-tile strong { font-size: var(--font-value-large); }
 
 #primaryBand { white-space: pre-line; }
 
@@ -252,7 +283,7 @@ h1 {
   display: grid;
   place-items: center;
   color: #050505;
-  font-size: 22px;
+  font-size: var(--font-section);
   letter-spacing: 0;
 }
 
@@ -261,7 +292,7 @@ h1 {
   grid-template-columns: 1fr 1fr;
   gap: 12px;
   margin-bottom: 8px;
-  font-size: 21px;
+  font-size: var(--font-section);
   text-align: center;
 }
 
@@ -273,7 +304,7 @@ h1 {
   gap: 10px;
   align-items: center;
   margin-bottom: 8px;
-  font-size: 21px;
+  font-size: var(--font-section);
 }
 
 .section-title strong { font-weight: 400; }
@@ -285,7 +316,7 @@ h1 {
   grid-template-columns: .85fr 1.15fr .75fr 1fr 1.15fr;
   gap: 2px;
   margin: 0 0 8px;
-  font-size: 20px;
+  font-size: var(--font-body);
   text-align: center;
   border-block: 1px solid #585858;
 }
@@ -308,7 +339,7 @@ h1 {
 
 .cell-summary strong {
   color: var(--muted);
-  font-size: 16px;
+  font-size: var(--font-small);
 }
 
 .metric-section {
@@ -320,7 +351,7 @@ h1 {
 .metric-section-title {
   margin-bottom: 6px;
   color: var(--muted);
-  font-size: 17px;
+  font-size: var(--font-small);
 }
 
 .metrics-grid {
@@ -337,7 +368,7 @@ h1 {
   align-items: center;
   gap: 6px;
   min-width: 0;
-  font-size: 20px;
+  font-size: var(--font-body);
 }
 
 .metric span {
@@ -355,7 +386,7 @@ h1 {
   padding: 0 6px;
   border: 2px solid #5d5d5d;
   background: #363636;
-  font-size: 18px;
+  font-size: var(--font-control);
   font-weight: 400;
   overflow-wrap: anywhere;
   white-space: normal;
@@ -389,7 +420,7 @@ h1 {
   grid-template-columns: 1fr 1fr;
   gap: 4px 14px;
   margin: 10px auto 10px;
-  font-size: 20px;
+  font-size: var(--font-body);
 }
 
 .traffic-grid div,
@@ -433,7 +464,7 @@ h1 {
   min-width: 720px;
   border-collapse: collapse;
   table-layout: fixed;
-  font-size: 20px;
+  font-size: var(--font-table);
 }
 
 .cells-table th,
@@ -455,7 +486,7 @@ h1 {
   gap: 12px;
   margin-top: 14px;
   padding-left: 8px;
-  font-size: 22px;
+  font-size: var(--font-section);
 }
 
 input[type="checkbox"] {
@@ -480,7 +511,7 @@ input[type="checkbox"] {
 .button-row button {
   min-height: 52px;
   border-radius: 4px;
-  font-size: 27px;
+  font-size: var(--font-button);
   line-height: 1.16;
 }
 
@@ -490,7 +521,7 @@ input[type="checkbox"] {
   align-items: center;
   gap: 9px;
   padding-right: 10px;
-  font-size: 25px;
+  font-size: var(--font-message);
   white-space: nowrap;
 }
 
@@ -500,7 +531,7 @@ input[type="checkbox"] {
   padding: 16px 13px;
   border: 2px solid #141414;
   background: var(--panel-deep);
-  font-size: 25px;
+  font-size: var(--font-message);
   line-height: 1.38;
   overflow-y: auto;
   overflow-wrap: anywhere;
@@ -526,7 +557,7 @@ input[type="checkbox"] {
 
 .settings-card h2 {
   margin: 0 0 18px;
-  font-size: 28px;
+  font-size: var(--font-button);
   font-weight: 400;
 }
 
@@ -546,13 +577,13 @@ input[type="checkbox"] {
 .settings-row span {
   margin: 0;
   color: var(--ink);
-  font-size: 27px;
+  font-size: var(--font-button);
   text-align: center;
 }
 
 .settings-row input {
   text-align: center;
-  font-size: 27px;
+  font-size: var(--font-button);
 }
 
 .developer-only { display: none; }
@@ -568,7 +599,7 @@ input[type="checkbox"] {
 .developer-title {
   margin-bottom: 12px;
   color: var(--muted);
-  font-size: 20px;
+  font-size: var(--font-body);
 }
 
 .settings-actions {
@@ -581,7 +612,7 @@ label span {
   display: block;
   margin-bottom: 6px;
   color: var(--muted);
-  font-size: 18px;
+  font-size: var(--font-control);
 }
 
 input,
@@ -615,7 +646,7 @@ select[multiple] { min-height: 190px; }
   padding: 0 18px;
 }
 
-.log-list { display: grid; gap: 8px; font-size: 20px; }
+.log-list { display: grid; gap: 8px; font-size: var(--font-body); }
 .log-list div { display: grid; grid-template-columns: 210px 1fr; gap: 12px; padding: 8px; border-bottom: 1px solid #666; }
 .log-list time { color: var(--muted); }
 
@@ -624,14 +655,14 @@ select[multiple] { min-height: 190px; }
 .wifi-view-tabs { display: flex; gap: 7px; margin-bottom: 9px; }
 .phone-tab,
 .phone-toolbar button,
-.wifi-view-tab { min-height: 44px; padding: 0 16px; font-size: 20px; border-radius: 3px; }
+.wifi-view-tab { min-height: 44px; padding: 0 16px; font-size: var(--font-body); border-radius: 3px; }
 .phone-tab.active { box-shadow: inset 0 -3px 0 var(--green); }
-.phone-message { display: none; min-height: 34px; color: var(--muted); font-size: 17px; }
+.phone-message { display: none; min-height: 34px; color: var(--muted); font-size: var(--font-small); }
 .phone-panel { display: none; }
 .phone-panel.active { display: block; }
 .phone-cellular-cards { display: grid; gap: 12px; }
 .phone-card { border: 2px solid #666; padding: 8px; background: #333; }
-.phone-card h2 { margin: 0 0 8px; font-size: 22px; font-weight: 400; }
+.phone-card h2 { margin: 0 0 8px; font-size: var(--font-section); font-weight: 400; }
 .phone-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 8px; text-align: center; }
 .phone-summary strong,
 .phone-summary span { display: block; min-width: 0; overflow-wrap: anywhere; }
@@ -655,7 +686,7 @@ select[multiple] { min-height: 190px; }
   border: 0;
   background: transparent;
   color: #0098d8;
-  font-size: 22px;
+  font-size: var(--font-section);
   text-decoration: underline;
   text-align: left;
 }
@@ -670,7 +701,7 @@ select[multiple] { min-height: 190px; }
   width: 100%;
   border-collapse: collapse;
   table-layout: fixed;
-  font-size: 19px;
+  font-size: var(--font-table);
   line-height: 1.14;
 }
 .wifi-table th,
@@ -759,7 +790,7 @@ select[multiple] { min-height: 190px; }
   z-index: 1;
   padding: 4px 5px 0;
   color: #f4f5fb;
-  font-size: 20px;
+  font-size: var(--font-body);
   line-height: 1.1;
 }
 .wifi-graph-gridlines {
@@ -777,7 +808,7 @@ select[multiple] { min-height: 190px; }
   position: absolute;
   left: -38px;
   color: #f4f5fb;
-  font-size: 20px;
+  font-size: var(--font-body);
   line-height: 1;
 }
 .wifi-graph-gridlines > span:not(.wifi-plot-dot):nth-child(1) { top: 11%; }
@@ -794,7 +825,7 @@ select[multiple] { min-height: 190px; }
   gap: 4px;
   padding-top: 6px;
   color: #f4f5fb;
-  font-size: 17px;
+  font-size: var(--font-small);
   white-space: nowrap;
 }
 .wifi-plot-dot {
@@ -813,7 +844,7 @@ select[multiple] { min-height: 190px; }
   max-width: 92px;
   overflow: hidden;
   color: #f4f5fb;
-  font-size: 12px;
+  font-size: var(--font-small);
   font-style: normal;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -840,13 +871,13 @@ select[multiple] { min-height: 190px; }
 }
 .wifi-help-card h2 {
   margin: 0 0 18px;
-  font-size: 34px;
+  font-size: var(--font-dialog-title);
   font-weight: 700;
 }
 .wifi-help-card ol {
   margin: 0;
   padding-left: 1.2em;
-  font-size: 28px;
+  font-size: var(--font-dialog-body);
   line-height: 1.38;
 }
 .wifi-help-card button {
@@ -857,34 +888,52 @@ select[multiple] { min-height: 190px; }
   border: 0;
   background: transparent;
   color: #f0f1f8;
-  font-size: 26px;
+  font-size: var(--font-button);
 }
 
 @media (max-width: 1100px) {
+  :root {
+    --font-title: 18px;
+    --font-tab: 14px;
+    --font-section: 13px;
+    --font-body: 12px;
+    --font-control: 11.5px;
+    --font-small: 10.5px;
+    --font-micro: 9.5px;
+    --font-value: 17px;
+    --font-value-large: 20px;
+    --font-icon: 15px;
+    --font-table: 10.5px;
+    --font-table-dense: 9.5px;
+    --font-button: 13px;
+    --font-message: 12px;
+    --font-dialog-title: 24px;
+    --font-dialog-body: 19px;
+  }
   .app-shell { width: 100vw; border: 0; }
   .topbar { min-height: 42px; padding: calc(5px + env(safe-area-inset-top)) 4px 5px; }
-  h1 { font-size: 17px; }
+  h1 { font-size: var(--font-title); }
   .tabs { gap: 2px; }
-  .tab { min-height: 32px; padding: 3px 1px; border-width: 1px; font-size: 13px; line-height: 1.2; }
+  .tab { min-height: 34px; padding: 3px 1px; border-width: 1px; font-size: var(--font-tab); line-height: 1.2; }
   .workspace { padding-inline: 1px; }
   .panel { min-height: 100%; padding: 5px 5px 8px; border-width: 1px; }
   .firefly-live { margin-bottom: 5px; padding: 0 0 5px; border-bottom: 1px solid #555; }
   .device-strip { grid-template-columns: minmax(0, 1fr) minmax(138px, 42%) 18px; gap: 4px; margin-bottom: 0; }
-  .network-line { gap: 3px 7px; font-size: 12px; line-height: 1.2; }
+  .network-line { gap: 3px 7px; font-size: var(--font-body); line-height: 1.2; }
   .network-line span { overflow-wrap: anywhere; }
-  .refresh-chip { min-height: 21px; padding: 0 5px; font-size: 10px; }
-  .power-glyph { font-size: 15px; }
+  .refresh-chip { min-height: 21px; padding: 0 5px; font-size: var(--font-small); }
+  .power-glyph { font-size: var(--font-icon); }
   .hero-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; margin-bottom: 5px; }
   .metric-tile { min-height: 56px; padding: 4px 5px 6px; border-width: 1px; }
   .metric-tile::after { height: 3px; }
-  .metric-tile span { font-size: 9px; line-height: 1.2; }
-  .metric-tile strong { margin-top: 2px; font-size: 17px; line-height: 1.08; white-space: normal; }
-  .signal-tile strong { font-size: 20px; }
-  .metric-tile em { margin-top: 2px; font-size: 8px; line-height: 1.15; }
-  .thermo { min-height: 22px; height: auto; border-width: 1px; box-shadow: inset 0 0 0 1px #303030; font-size: 12px; line-height: 1.2; }
-  .identity-row { gap: 4px; margin-bottom: 4px; font-size: 11px; }
+  .metric-tile span { font-size: var(--font-micro); line-height: 1.2; }
+  .metric-tile strong { margin-top: 2px; font-size: var(--font-value); line-height: 1.08; white-space: normal; }
+  .signal-tile strong { font-size: var(--font-value-large); }
+  .metric-tile em { margin-top: 2px; font-size: var(--font-micro); line-height: 1.15; }
+  .thermo { min-height: 22px; height: auto; border-width: 1px; box-shadow: inset 0 0 0 1px #303030; font-size: var(--font-body); line-height: 1.2; }
+  .identity-row { gap: 4px; margin-bottom: 4px; font-size: var(--font-control); }
   .identity-row div { min-width: 0; overflow-wrap: anywhere; }
-  .section-title { flex-wrap: wrap; gap: 5px; margin-bottom: 5px; font-size: 11px; white-space: normal; }
+  .section-title { flex-wrap: wrap; gap: 5px; margin-bottom: 5px; font-size: var(--font-control); white-space: normal; }
   .cell-summary {
     grid-template-columns: 1fr;
     gap: 0;
@@ -893,7 +942,7 @@ select[multiple] { min-height: 190px; }
     border: 0;
     border-block: 1px solid #555;
     background: transparent;
-    font-size: 11px;
+    font-size: var(--font-control);
     text-align: left;
   }
   .cell-summary div {
@@ -907,25 +956,25 @@ select[multiple] { min-height: 190px; }
   .cell-summary div:last-child { border-bottom: 0; }
   .cell-summary strong,
   .cell-summary span { min-height: 20px; padding: 3px 4px; overflow-wrap: anywhere; }
-  .cell-summary strong { color: #b9bac1; font-size: 10px; text-align: left; }
-  .cell-summary span { font-size: 11px; line-height: 1.25; }
+  .cell-summary strong { color: #b9bac1; font-size: var(--font-small); text-align: left; }
+  .cell-summary span { font-size: var(--font-control); line-height: 1.25; }
   .metric-section { padding-top: 5px; margin-top: 5px; }
-  .metric-section-title { margin-bottom: 3px; font-size: 10px; }
+  .metric-section-title { margin-bottom: 3px; font-size: var(--font-small); }
   .metrics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 7px; row-gap: 4px; margin-bottom: 0; }
-  .metric { grid-template-columns: 60px minmax(0, 1fr); gap: 3px; font-size: 10px; }
+  .metric { grid-template-columns: 60px minmax(0, 1fr); gap: 3px; font-size: var(--font-small); }
   .metric span { line-height: 1.25; }
-  .metric.mimo strong { min-height: 22px; border-width: 1px; padding: 1px 3px; font-size: 9px; line-height: 1.2; }
+  .metric.mimo strong { min-height: 22px; border-width: 1px; padding: 1px 3px; font-size: var(--font-micro); line-height: 1.2; }
   .meter { min-height: 22px; border-width: 1px; box-shadow: inset 0 0 0 1px #303030; white-space: normal; }
   .traffic-grid,
   .status-grid,
-  .plugin-grid { gap: 2px 6px; margin: 6px 0; font-size: 10px; }
+  .plugin-grid { gap: 2px 6px; margin: 6px 0; font-size: var(--font-small); }
   .traffic-grid div,
   .status-grid div,
   .plugin-grid div { grid-template-columns: 58px minmax(0, 1fr); gap: 3px; padding: 1px 2px; }
   .plugin-grid strong,
   .plugin-grid span { display: block; }
   .table-wrap { min-height: clamp(180px, 25vh, 265px); border-width: 1px; }
-  .cells-table { min-width: 100%; font-size: 9px; }
+  .cells-table { min-width: 100%; font-size: var(--font-table); }
   .cells-table th:nth-child(2),
   .cells-table td:nth-child(2) { width: 12%; }
   .cells-table th:nth-child(3),
@@ -941,45 +990,45 @@ select[multiple] { min-height: 190px; }
   .cells-table th,
   .cells-table td { min-height: 24px; border-width: 1px; padding: 3px 1px; line-height: 1.35; overflow-wrap: anywhere; }
   .mini-meter { min-height: 21px; border-width: 1px; box-shadow: inset 0 0 0 1px #303030; }
-  .inline-control { gap: 5px; margin-top: 6px; padding-left: 7px; font-size: 11px; }
+  .inline-control { gap: 5px; margin-top: 6px; padding-left: 7px; font-size: var(--font-control); }
   input[type="checkbox"] { width: 19px; height: 19px; }
   .bottom-bar { grid-template-columns: 1fr 1fr auto; gap: 4px; padding: 4px 2px; }
   .bottom-bar button,
-  .button-row button { min-height: 32px; border-width: 1px; font-size: 12px; line-height: 1.35; white-space: normal; }
-  .auto-refresh { gap: 3px; padding-right: 3px; font-size: 11px; }
-  .message-line { min-height: 40px; max-height: 58px; padding: 6px 5px calc(6px + env(safe-area-inset-bottom)); border-width: 1px; font-size: 11px; line-height: 1.38; }
+  .button-row button { min-height: 34px; border-width: 1px; font-size: var(--font-button); line-height: 1.3; white-space: normal; }
+  .auto-refresh { gap: 3px; padding-right: 3px; font-size: var(--font-button); }
+  .message-line { min-height: 42px; max-height: 60px; padding: 6px 5px calc(6px + env(safe-area-inset-bottom)); border-width: 1px; font-size: var(--font-message); line-height: 1.36; }
   .settings-card { min-height: 100%; padding: 8px 9px; border-width: 1px; }
-  .settings-card h2 { margin-bottom: 10px; font-size: 16px; }
+  .settings-card h2 { margin-bottom: 10px; font-size: var(--font-section); }
   .settings-simple { gap: 8px; }
   .settings-row { grid-template-columns: 92px minmax(0, 1fr); gap: 8px; }
   .settings-row span,
-  .settings-row input { font-size: 13px; }
+  .settings-row input { font-size: var(--font-section); }
   .developer-settings { margin-top: 12px; padding-top: 10px; }
-  .developer-title { margin-bottom: 6px; font-size: 11px; }
+  .developer-title { margin-bottom: 6px; font-size: var(--font-control); }
   .form-grid,
   .form-grid.compact { grid-template-columns: 1fr 1fr; gap: 6px; }
-  label span { margin-bottom: 2px; font-size: 9px; }
+  label span { margin-bottom: 2px; font-size: var(--font-micro); }
   input,
-  select { min-height: 28px; border-width: 1px; padding: 3px 5px; font-size: 10px; }
+  select { min-height: 30px; border-width: 1px; padding: 3px 5px; font-size: var(--font-control); }
   select[multiple] { min-height: 100px; }
   .button-row { gap: 5px; margin-top: 7px; }
   .button-row button { flex: 1 1 calc(50% - 8px); min-width: 0; padding-inline: 6px; }
-  .log-list { gap: 3px; font-size: 9px; }
+  .log-list { gap: 3px; font-size: var(--font-micro); }
   .log-list div { grid-template-columns: 1fr; gap: 2px; padding: 4px; }
   .phone-tabs,
   .phone-toolbar,
   .wifi-view-tabs { gap: 4px; margin-bottom: 5px; }
   .phone-tab,
   .phone-toolbar button,
-  .wifi-view-tab { min-height: 32px; padding: 3px 8px; font-size: 11px; line-height: 1.35; }
-  .phone-message { min-height: 18px; font-size: 9px; }
+  .wifi-view-tab { min-height: 32px; padding: 3px 8px; font-size: var(--font-control); line-height: 1.3; }
+  .phone-message { min-height: 18px; font-size: var(--font-micro); }
   .phone-cellular-cards { gap: 6px; }
   .phone-card { border-width: 1px; padding: 4px; }
-  .phone-card h2 { margin-bottom: 4px; font-size: 11px; }
-  .phone-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3px; margin-bottom: 4px; font-size: 9px; }
+  .phone-card h2 { margin-bottom: 4px; font-size: var(--font-control); }
+  .phone-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3px; margin-bottom: 4px; font-size: var(--font-micro); }
   .phone-summary .boxed { border-width: 1px; }
   .phone-table-wrap { min-height: 0; overflow-x: hidden; }
-  .phone-table { min-width: 0; font-size: 8px; }
+  .phone-table { min-width: 0; font-size: var(--font-table-dense); }
   .phone-table th:nth-child(1),
   .phone-table td:nth-child(1) { width: 19%; }
   .phone-table th:nth-child(2),
@@ -994,10 +1043,10 @@ select[multiple] { min-height: 190px; }
   .phone-table td:nth-child(6) { width: 17%; }
   .phone-table th,
   .phone-table td { min-height: 24px; border-width: 1px; padding: 3px 1px; line-height: 1.35; overflow-wrap: anywhere; }
-  .phone-empty { padding: 8px 4px; font-size: 9px; }
-  .wifi-help-link { margin-bottom: 4px; font-size: 13px; }
+  .phone-empty { padding: 8px 4px; font-size: var(--font-small); }
+  .wifi-help-link { margin-bottom: 4px; font-size: var(--font-section); }
   .wifi-table-wrap { border-width: 1px; }
-  .wifi-table { font-size: 10px; line-height: 1.15; }
+  .wifi-table { font-size: var(--font-table); line-height: 1.15; }
   .wifi-table th,
   .wifi-table td { min-height: 30px; border-width: 1px; padding: 2px 1px; box-shadow: inset 0 0 0 1px #444; }
   .wifi-table th { min-height: 24px; }
@@ -1005,20 +1054,23 @@ select[multiple] { min-height: 190px; }
   .wifi-bar::before { inset: 2px auto 2px 2px; }
   .wifi-graphs { gap: 16px; padding: 3px 6px 8px; border-width: 1px; }
   .wifi-graph { grid-template-columns: 33px minmax(0, 1fr); }
-  .wifi-graph-title { padding: 3px 4px 0; font-size: 12px; }
+  .wifi-graph-title { padding: 3px 4px 0; font-size: var(--font-body); }
   .wifi-graph-gridlines { height: clamp(124px, 27vh, 190px); border-width: 1px; }
-  .wifi-graph-gridlines > span:not(.wifi-plot-dot) { left: -29px; font-size: 12px; }
-  .wifi-axis { gap: 2px; padding-top: 4px; font-size: 9px; overflow: hidden; }
+  .wifi-graph-gridlines > span:not(.wifi-plot-dot) { left: -29px; font-size: var(--font-body); }
+  .wifi-axis { gap: 2px; padding-top: 4px; font-size: var(--font-micro); overflow: hidden; }
   .wifi-plot-dot { width: 7px; height: 7px; }
   .wifi-plot-dot i { display: none; }
   .wifi-help-modal { padding: 20px; }
   .wifi-help-card { width: min(86vw, 420px); padding: 26px 28px 22px; border-radius: 30px; }
-  .wifi-help-card h2 { margin-bottom: 12px; font-size: 24px; }
-  .wifi-help-card ol { font-size: 20px; line-height: 1.38; }
-  .wifi-help-card button { min-height: 46px; margin-top: 18px; font-size: 18px; }
+  .wifi-help-card h2 { margin-bottom: 12px; font-size: var(--font-dialog-title); }
+  .wifi-help-card ol { font-size: var(--font-dialog-body); line-height: 1.38; }
+  .wifi-help-card button { min-height: 46px; margin-top: 18px; font-size: var(--font-section); }
 }
 
 @media (max-width: 500px) {
+  .panel { padding-inline: 5px; }
+  .metric { grid-template-columns: 58px minmax(0, 1fr); font-size: var(--font-small); }
+  .traffic-grid div { grid-template-columns: 58px minmax(0, 1fr)@media (max-width: 500px) {
   .panel { padding-inline: 5px; }
   .metric { grid-template-columns: 58px minmax(0, 1fr); font-size: 10px; }
   .traffic-grid div { grid-template-columns: 58px minmax(0, 1fr); }

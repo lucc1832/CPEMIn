@@ -313,7 +313,7 @@ class MainActivity : ComponentActivity() {
                 token,
                 JSONObject()
                     .put("ok", false)
-                    .put("error", getString(R.string.err_fh_timeout))
+                    .put("error", "烽火本地接口暂时 timeout，正在等待设备返回数据")
                     .toString()
             )
         }.start()
@@ -538,7 +538,7 @@ class MainActivity : ComponentActivity() {
                 .removePrefix("http://")
                 .removePrefix("https://")
                 .trimEnd('/')
-            require(host.isNotBlank()) { getString(R.string.err_device_host_blank) }
+            require(host.isNotBlank()) { "设备地址不能为空" }
             val baseUrl = "http://$host"
 
             readFiberHomeToolBaseInfo(host, username, password)?.let { return it.toString() }
@@ -598,7 +598,7 @@ class MainActivity : ComponentActivity() {
             }
 
             val errorMessage = if (matched == 0) {
-                val suffix = loginError.takeIf { it.isNotBlank() }?.let { getString(R.string.login_hint_suffix, it) } ?: ""
+                val suffix = loginError.takeIf { it.isNotBlank() }?.let { "；登录提示：$it" } ?: ""
                 "已连到设备，但未匹配到当前固件的只读状态接口$suffix"
             } else {
                 JSONObject.NULL
@@ -635,7 +635,7 @@ class MainActivity : ComponentActivity() {
         password: String
     ): FiberLoginResult {
         if (username.isBlank() && password.isBlank()) {
-            return FiberLoginResult(false, getString(R.string.err_fh_no_credentials))
+            return FiberLoginResult(false, "未填写账号密码，已尝试免登录只读接口")
         }
         return try {
             val headers = fiberHeaders(session.sessionId, session.token, baseUrl)
@@ -842,7 +842,7 @@ class MainActivity : ComponentActivity() {
             null,
             headers
         )
-        if (response.code >= 400) error(getString(R.string.err_fh_session_fail, response.code))
+        if (response.code >= 400) error("获取烽火会话失败：HTTP ${response.code}")
         val sessionId = try {
             JSONObject(response.body).optString("sessionid")
                 .ifBlank { JSONObject(response.body).optString("SessionID") }
@@ -859,7 +859,7 @@ class MainActivity : ComponentActivity() {
             ?.substringAfter('=')
             .orEmpty()
         val effectiveSessionId = sessionId.ifBlank { cookieSession }
-        if (effectiveSessionId.length < 16) error(getString(R.string.err_fh_session_invalid))
+        if (effectiveSessionId.length < 16) error("烽火会话无效")
         val token = response.header("WebToken").ifBlank { headers["WebToken"].orEmpty() }
         return FiberSession(effectiveSessionId, token)
     }
@@ -1065,7 +1065,7 @@ class MainActivity : ComponentActivity() {
     private fun readPhoneSignalsJson(): String {
         if (!hasPhonePermission()) {
             runOnUiThread { requestPhonePermissionsIfNeeded() }
-            return "{\"ok\":false,\"error\":\"${getString(R.string.err_permission_required)}\",\"wifi\":${readWifiJson()}}"
+            return "{\"ok\":false,\"error\":\"需要授予定位和电话权限后才能读取手机信号\",\"wifi\":${readWifiJson()}}"
         }
 
         return try {
@@ -1106,7 +1106,7 @@ class MainActivity : ComponentActivity() {
         val parsed = (cells ?: emptyList()).mapNotNull { parseCell(it) }
         val primary = parsed.firstOrNull { it.registered } ?: parsed.firstOrNull()
         val title =
-            "${carrier.takeUnless { it.isNullOrBlank() } ?: getString(R.string.unknown)}|${parsed.count { it.registered }}"
+            "${carrier.takeUnless { it.isNullOrBlank() } ?: "未知"}|${parsed.count { it.registered }}"
         val rows = parsed.joinToString(",") { phoneCellJson(it) }
 
         return "{" +

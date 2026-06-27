@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="#191b29">
     <title>CPEManager 本地自用版</title>
+191b29">
+    <title>CPEManager 本地自用版</title>
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="stylesheet" href="./styles.css">
 </head>
@@ -13,12 +15,12 @@
     <header class="topbar">
         <div>
             <h1>CPEManager 3.8.1（本地自用版）</h1>
-            <div class="subline" id="deviceHeadline">&#26412;&#22320;&#27169;&#24335;</div>
+            <div class="subline" id="deviceHeadline">本地模式</div>
         </div>
         <div class="top-actions">
             <button class="icon-button" id="installApp" title="Install">+</button>
-            <button class="icon-button" id="refreshNow" title="Refresh">&#8635;</button>
-            <button class="icon-button" id="saveSettingsTop" title="Save">&#9635;</button>
+            <button class="icon-button" id="refreshNow" title="Refresh">↻</button>
+            <button class="icon-button" id="saveSettingsTop" title="Save">▣</button>
         </div>
     </header>
 
@@ -36,10 +38,10 @@
                     <div class="network-line">
                         <span id="operatorName">--</span>
                         <span id="networkMode">--</span>
-                        <span>&uarr;&darr;</span>
+                        <span>↑↓</span>
                     </div>
                     <div class="thermo" id="temperatureBar"><span>--</span></div>
-                    <div class="power-glyph" title="供电状态">&#9889;</div>
+                    <div class="power-glyph" title="供电状态">⚡</div>
                 </div>
             </div>
 
@@ -137,18 +139,18 @@
             </div>
 
             <div class="inline-control">
-                <label for="airplaneToggle">&#39134;&#34892;&#27169;&#24335;&#65306;</label>
+                <label for="airplaneToggle">飞行模式：</label>
                 <input type="checkbox" id="airplaneToggle">
-                <span>&#21551;&#29992;</span>
+                <span>启用</span>
             </div>
             <div class="button-row cpe-actions">
-                <button id="openBackendPageFirefly">&#25171;&#24320;&#30495;&#23454;&#28925;&#28779;&#21518;&#21488;</button>
+                <button id="openBackendPageFirefly">打开真实烽火后台</button>
             </div>
         </section>
 
         <section class="panel tab-panel" id="panel-lock">
             <div class="form-grid compact">
-                <label><span>&#38145;&#23450;&#39057;&#27573;</span><select id="bandSelect" multiple
+                <label><span>锁定频段</span><select id="bandSelect" multiple
                                                                             size="6">
                     <option>N1</option>
                     <option>N3</option>
@@ -159,15 +161,15 @@
                     <option>N78</option>
                     <option>N79</option>
                 </select></label>
-                <label><span>&#39318;&#36873; PCI</span><input id="preferredPci" inputmode="numeric"
+                <label><span>首选 PCI</span><input id="preferredPci" inputmode="numeric"
                                                                placeholder="385"></label>
-                <label><span>&#39318;&#36873; ARFCN</span><input id="preferredArfcn"
+                <label><span>首选 ARFCN</span><input id="preferredArfcn"
                                                                  inputmode="numeric"
                                                                  placeholder="152650"></label>
             </div>
             <div class="button-row">
-                <button id="applyLock">&#24212;&#29992;&#38145;&#39057;</button>
-                <button id="clearLock">&#28165;&#31354;</button>
+                <button id="applyLock">应用锁频</button>
+                <button id="clearLock">清空</button>
             </div>
         </section>
 
@@ -233,23 +235,23 @@
 
         <section class="panel tab-panel" id="panel-phone">
             <div class="phone-tabs">
-                <button class="phone-tab active" data-phone-tab="cellular">&#34562;&#31389;</button>
+                <button class="phone-tab active" data-phone-tab="cellular">蜂窝</button>
                 <button class="phone-tab" data-phone-tab="wifi">WLAN</button>
             </div>
-            <div class="phone-message" id="phoneSignalMessage">&#31561;&#24453;&#35835;&#21462;&#25163;&#26426;&#20449;&#21495;&#12290;</div>
+            <div class="phone-message" id="phoneSignalMessage">等待读取手机信号。</div>
             <div class="phone-panel active" id="phoneCellularPanel">
                 <div id="phoneCellularCards" class="phone-cellular-cards"></div>
             </div>
             <div class="phone-panel" id="phoneWifiPanel">
                 <div class="wifi-view-tabs">
-                    <button class="wifi-view-tab active" data-wifi-view="graph">&#22270;&#24418;</button>
-                    <button class="wifi-view-tab" data-wifi-view="list">&#21015;&#34920;</button>
+                    <button class="wifi-view-tab active" data-wifi-view="graph">图形</button>
+                    <button class="wifi-view-tab" data-wifi-view="list">列表</button>
                 </div>
                 <div class="wifi-view active" id="wifiGraphView">
                     <div class="wifi-graphs" id="wifiGraphs"></div>
                 </div>
                 <div class="wifi-view" id="wifiListView">
-                    <button class="wifi-help-link" id="wifiHelpLink" type="button">&#28857;&#20987;&#26597;&#30475;&#34920;&#26684;&#39033;&#35828;&#26126;</button>
+                    <button class="wifi-help-link" id="wifiHelpLink" type="button">点击查看表格项说明</button>
                     <div class="wifi-table-wrap">
                         <table class="wifi-table">
                             <thead>
@@ -277,31 +279,31 @@
 
     <div class="wifi-help-modal" id="wifiHelpModal" hidden>
         <div class="wifi-help-card" role="dialog" aria-modal="true" aria-labelledby="wifiHelpTitle">
-            <h2 id="wifiHelpTitle">&#34920;&#26684;&#39033;&#30446;&#35828;&#26126;</h2>
+            <h2 id="wifiHelpTitle">表格项目说明</h2>
             <ol>
-                <li>ssid&#20026;&#32593;&#32476;&#21517;&#31216;&#65307;</li>
-                <li>freq&#20026;&#24037;&#20316;&#39057;&#29575;&#65288;&#21333;&#20301;MHz&#65289;&#65307;</li>
-                <li>standard&#25351;&#21327;&#35758;&#29256;&#26412;&#65288;Wi-Fi 4/5/6/7&#65289;&#65307;</li>
-                <li>Band&#26159;&#20449;&#36947;&#39057;&#29575;&#23485;&#24230;&#65288;MHz&#65289;&#65307;</li>
-                <li>ant&#20026;&#22825;&#32447;&#25968;&#65292;&#22823;&#22810;&#25968;&#25509;&#20837;&#28857;&#20026;2&#20010;&#65292;&#39640;&#31471;&#30340;&#21487;&#33021;&#20026;4&#65307;</li>
-                <li>rssi&#34920;&#31034;&#25163;&#26426;&#25509;&#25910;&#21040;&#20449;&#21495;&#24378;&#24230;&#65288;dBm&#65289;&#65307;</li>
-                <li>txpwr&#26159;&#25509;&#20837;&#28857;&#21457;&#23556;&#21151;&#29575;&#65288;dBm&#65289;&#65292;&#37096;&#20998;&#21378;&#23478;&#25968;&#25454;&#21487;&#33021;&#19981;&#20934;&#65307;</li>
-                <li>ue&#34920;&#31034;&#24403;&#21069;ssid&#19978;&#30340;&#23458;&#25143;&#31471;&#25968;&#37327;&#65307;</li>
-                <li>busy&#34920;&#31034;&#20449;&#36947;&#20351;&#29992;&#29575;&#65292;&#21453;&#26144;&#35813;&#25509;&#20837;&#28857;&#25152;&#22312;&#20301;&#32622;&#19978;&#30456;&#24212;&#39057;&#29575;&#30340;&#25317;&#22581;&#31243;&#24230;&#65307;</li>
-                <li>B&#34920;&#31034;&#26159;&#21542;&#25903;&#25345;&#27874;&#26463;&#25104;&#24418;&#65307;</li>
-                <li>R&#34920;&#31034;&#25509;&#20837;&#28857;&#26159;&#21542;&#25903;&#25345;&#24555;&#36895;&#28459;&#28216;&#65288;802.11r/k/v&#65289;&#12290;</li>
+                <li>ssid为网络名称；</li>
+                <li>freq为工作频率（单位MHz）；</li>
+                <li>standard指协议版本（Wi-Fi 4/5/6/7）；</li>
+                <li>Band是信道频率宽度（MHz）；</li>
+                <li>ant为天线数，大多数接入点为2个，高端的可能为4；</li>
+                <li>rssi表示手机接收到信号强度（dBm）；</li>
+                <li>txpwr是接入点发射功率（dBm），部分厂家数据可能不准；</li>
+                <li>ue表示当前ssid上的客户端数量；</li>
+                <li>busy表示信道使用率，反映该接入点所在位置上相应频率的拥堵程度；</li>
+                <li>B表示是否支持波束成形；</li>
+                <li>R表示接入点是否支持快速漫游（802.11r/k/v）。</li>
             </ol>
             <button id="wifiHelpOk" type="button">OK</button>
         </div>
     </div>
 
     <footer class="bottom-bar">
-        <button id="rebootDevice">&#37325;&#21551;</button>
-        <button id="logoutDevice">&#36864;&#20986;</button>
-        <label class="auto-refresh"><input type="checkbox" id="autoRefresh"> &#33258;&#21160;&#21047;&#26032;</label>
+        <button id="rebootDevice">重启</button>
+        <button id="logoutDevice">退出</button>
+        <label class="auto-refresh"><input type="checkbox" id="autoRefresh"> 自动刷新</label>
     </footer>
 
-    <div class="message-line" id="messageLine">&#20934;&#22791;&#23601;&#32490;&#12290;</div>
+    <div class="message-line" id="messageLine">准备就绪。    <div class="message-line" id="messageLine">&#20934;&#22791;&#23601;&#32490;&#12290;</div>
 </div>
 
 <script src="./app.js"></script>
