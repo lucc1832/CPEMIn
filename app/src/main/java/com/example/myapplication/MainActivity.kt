@@ -4,6 +4,7 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.wifi.ScanResult
 import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.Bundle
@@ -312,7 +313,7 @@ class MainActivity : ComponentActivity() {
                 token,
                 JSONObject()
                     .put("ok", false)
-                    .put("error", "烽火本地接口暂时 timeout，正在等待设备返回数据")
+                    .put("error", getString(R.string.err_fh_timeout))
                     .toString()
             )
         }.start()
@@ -537,7 +538,7 @@ class MainActivity : ComponentActivity() {
                 .removePrefix("http://")
                 .removePrefix("https://")
                 .trimEnd('/')
-            require(host.isNotBlank()) { "设备地址不能为空" }
+            require(host.isNotBlank()) { getString(R.string.err_device_host_blank) }
             val baseUrl = "http://$host"
 
             readFiberHomeToolBaseInfo(host, username, password)?.let { return it.toString() }
@@ -597,7 +598,7 @@ class MainActivity : ComponentActivity() {
             }
 
             val errorMessage = if (matched == 0) {
-                val suffix = loginError.takeIf { it.isNotBlank() }?.let { "；登录提示：$it" } ?: ""
+                val suffix = loginError.takeIf { it.isNotBlank() }?.let { getString(R.string.login_hint_suffix, it) } ?: ""
                 "已连到设备，但未匹配到当前固件的只读状态接口$suffix"
             } else {
                 JSONObject.NULL
@@ -634,7 +635,7 @@ class MainActivity : ComponentActivity() {
         password: String
     ): FiberLoginResult {
         if (username.isBlank() && password.isBlank()) {
-            return FiberLoginResult(false, "未填写账号密码，已尝试免登录只读接口")
+            return FiberLoginResult(false, getString(R.string.err_fh_no_credentials))
         }
         return try {
             val headers = fiberHeaders(session.sessionId, session.token, baseUrl)
@@ -841,7 +842,7 @@ class MainActivity : ComponentActivity() {
             null,
             headers
         )
-        if (response.code >= 400) error("获取烽火会话失败：HTTP ${response.code}")
+        if (response.code >= 400) error(getString(R.string.err_fh_session_fail, response.code))
         val sessionId = try {
             JSONObject(response.body).optString("sessionid")
                 .ifBlank { JSONObject(response.body).optString("SessionID") }
@@ -858,7 +859,7 @@ class MainActivity : ComponentActivity() {
             ?.substringAfter('=')
             .orEmpty()
         val effectiveSessionId = sessionId.ifBlank { cookieSession }
-        if (effectiveSessionId.length < 16) error("烽火会话无效")
+        if (effectiveSessionId.length < 16) error(getString(R.string.err_fh_session_invalid))
         val token = response.header("WebToken").ifBlank { headers["WebToken"].orEmpty() }
         return FiberSession(effectiveSessionId, token)
     }
@@ -1063,7 +1064,8 @@ class MainActivity : ComponentActivity() {
     @SuppressLint("MissingPermission")
     private fun readPhoneSignalsJson(): String {
         if (!hasPhonePermission()) {
-            return "{\"ok\":false,\"error\":\"需要授予定位和电话权限后才能读取手机信号\"}"
+            runOnUiThread { requestPhonePermissionsIfNeeded() }
+            return "{\"ok\":false,\"error\":\"${getString(R.string.err_permission_required)}\",\"wifi\":${readWifiJson()}}"
         }
 
         return try {
@@ -1104,7 +1106,7 @@ class MainActivity : ComponentActivity() {
         val parsed = (cells ?: emptyList()).mapNotNull { parseCell(it) }
         val primary = parsed.firstOrNull { it.registered } ?: parsed.firstOrNull()
         val title =
-            "${carrier.takeUnless { it.isNullOrBlank() } ?: "未知"}|${parsed.count { it.registered }}"
+            "${carrier.takeUnless { it.isNullOrBlank() } ?: getString(R.string.unknown)}|${parsed.count { it.registered }}"
         val rows = parsed.joinToString(",") { phoneCellJson(it) }
 
         return "{" +
@@ -1269,20 +1271,154 @@ class MainActivity : ComponentActivity() {
         return value != Int.MAX_VALUE && value != Int.MIN_VALUE && value != 99
     }
 
+    @SuppressLint("MissingPermission")
     private fun readWifiJson(): String {
         return try {
             val wifi = applicationContext.getSystemService(WifiManager::class.java)
             val info = wifi.connectionInfo
-            "{" +
-                    "\"ssid\":${quote(info.ssid?.trim('"') ?: "N/A")}," +
-                    "\"bssid\":${quote(info.bssid ?: "N/A")}," +
-                    "\"rssi\":${quote(cleanInt(info.rssi))}," +
-                    "\"linkSpeed\":${quote("${info.linkSpeed}Mbps")}," +
-                    "\"frequency\":${quote("${info.frequency}MHz")}" +
-                    "}"
+            val currentSsid = info.ssid?.trim('"') ?: ""
+            val currentBssid = info.bssid ?: ""
+            val networks = JSONArray()
+            val scanResults = try {
+                wifi.scanResults ?: emptyList()
+            } catch (_: SecurityException) {
+                emptyList()
+            }
+
+            scanResults
+                .sortedWith(
+                    compareByDescending<ScanResult> { it.BSSID == currentBssid }
+                        .thenByDescending { it.level }
+                        .thenBy { it.SSID ?: "" }
+                )
+                .take(50)
+                .forEach { scan ->
+                    val capabilities = scan.capabilities ?: ""
+                    val ssid = scan.SSID?.takeIf { it.isNotBlank() } ?: scan.BSSID ?: "N/A"
+                    val isCurrent = scan.BSSID == currentBssid || ssid == currentSsid
+                    networks.put(
+                        JSONObject()
+                            .put("ssid", ssid)
+                            .put("bssid", scan.BSSID ?: "")
+                            .put("freq", scan.frequency)
+                            .put("std", wifiStandard(scan))
+                            .put("band", channelBandwidthMhz(scan.channelWidth))
+                            .put("ant", "2")
+                            .put("rssi", cleanInt(scan.level))
+                            .put("txpwr", "N/A")
+                            .put("ue", if (isCurrent) "1" else "0")
+                            .put("busy", wifiBusy(scan))
+                            .put("beamforming", supportFlag(capabilities, "BF", "BEAMFORM"))
+                            .put("roaming", supportFlag(capabilities, "FT", "802.11R", "RRM", "NEIGHBOR"))
+                    )
+                }
+
+            if (networks.length() == 0) {
+                networks.put(
+                    JSONObject()
+                        .put("ssid", currentSsid.ifBlank { "N/A" })
+                        .put("bssid", currentBssid.ifBlank { "N/A" })
+                        .put("freq", if (isValid(info.frequency)) info.frequency else "N/A")
+                        .put("std", "N/A")
+                        .put("band", "N/A")
+                        .put("ant", "N/A")
+                        .put("rssi", cleanInt(info.rssi))
+                        .put("txpwr", "N/A")
+                        .put("ue", "1")
+                        .put("busy", "N/A")
+                        .put("beamforming", "")
+                        .put("roaming", "")
+                )
+            }
+
+            JSONObject()
+                .put("ssid", currentSsid.ifBlank { "N/A" })
+                .put("bssid", currentBssid.ifBlank { "N/A" })
+                .put("rssi", cleanInt(info.rssi))
+                .put("linkSpeed", "${info.linkSpeed}Mbps")
+                .put("frequency", if (isValid(info.frequency)) "${info.frequency}MHz" else "N/A")
+                .put("networks", networks)
+                .toString()
         } catch (error: Exception) {
             "{\"error\":${quote(error.message ?: error.javaClass.simpleName)}}"
         }
+    }
+
+    private fun channelBandwidthMhz(width: Int): String {
+        return when (width) {
+            0 -> "20"
+            1 -> "40"
+            2 -> "80"
+            3 -> "160"
+            4 -> "80"
+            5 -> "320"
+            else -> "N/A"
+        }
+    }
+
+    @SuppressLint("NewApi")
+    private fun wifiStandard(scan: ScanResult): String {
+        val standard = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            try {
+                scan.wifiStandard
+            } catch (_: Exception) {
+                0
+            }
+        } else {
+            0
+        }
+        return when (standard) {
+            8 -> "be"
+            6 -> "ax"
+            5 -> "ac"
+            4 -> "n"
+            else -> inferWifiStandard(scan.capabilities ?: "", scan.frequency)
+        }
+    }
+
+    private fun inferWifiStandard(capabilities: String, frequency: Int): String {
+        val caps = capabilities.uppercase(Locale.US)
+        return when {
+            caps.contains("EHT") -> "be"
+            caps.contains("HE") -> "ax"
+            caps.contains("VHT") -> "ac"
+            caps.contains("HT") -> "n"
+            frequency >= 5000 -> "ac"
+            else -> "n"
+        }
+    }
+
+    @SuppressLint("NewApi")
+    private fun wifiBusy(scan: ScanResult): String {
+        return try {
+            val element = scan.informationElements?.firstOrNull { item -> item.id == 11 } ?: return "N/A"
+            val bytes = informationElementBytes(element) ?: return "N/A"
+            if (bytes.size < 3) return "N/A"
+            val utilization = bytes[2].toInt() and 255
+            Math.round(utilization * 100.0 / 255.0).toInt().toString()
+        } catch (_: Exception) {
+            "N/A"
+        }
+    }
+
+    private fun informationElementBytes(element: ScanResult.InformationElement): ByteArray? {
+        return try {
+            when (val value = element.javaClass.getField("bytes").get(element)) {
+                is ByteArray -> value
+                is java.nio.ByteBuffer -> {
+                    val buffer = value.asReadOnlyBuffer()
+                    ByteArray(buffer.remaining()).also { buffer.get(it) }
+                }
+                else -> null
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun supportFlag(capabilities: String, vararg tokens: String): String {
+        val caps = capabilities.uppercase(Locale.US)
+        return if (tokens.any { caps.contains(it) }) "Y" else ""
     }
 
     private fun readWifiGatewayJson(): String {

@@ -25,89 +25,98 @@
     <nav class="tabs" aria-label="tabs">
         <button class="tab active" data-tab="settings">设置</button>
         <button class="tab" data-tab="logs">日志</button>
-        <button class="tab" data-tab="plugins">插件</button>
         <button class="tab" data-tab="phone">手机</button>
         <button class="tab" data-tab="firefly">烽火</button>
     </nav>
 
     <main class="workspace">
         <section class="panel tab-panel" id="panel-firefly">
-            <div class="device-strip">
-                <div class="network-line"><span id="operatorName">&#31227;&#21160;</span> <span
-                        id="networkMode">SA</span> &uarr;&darr;
+            <div class="firefly-live">
+                <div class="device-strip">
+                    <div class="network-line">
+                        <span id="operatorName">--</span>
+                        <span id="networkMode">--</span>
+                        <span>&uarr;&darr;</span>
+                    </div>
+                    <div class="thermo" id="temperatureBar"><span>--</span></div>
+                    <div class="power-glyph" title="供电状态">&#9889;</div>
                 </div>
-                <div class="thermo" id="temperatureBar"><span>33&deg;C</span></div>
-                <div class="power-glyph" title="&#20379;&#30005;&#29366;&#24577;">&#9889;</div>
             </div>
 
             <div class="identity-row">
-                <div><strong>&#22411;&#21495;&#65306;</strong><span id="modelValue">LG6151M</span>
-                </div>
-                <div><strong>&#29256;&#26412;&#65306;</strong><span id="versionValue">RP0102</span>
-                </div>
+                <div><strong>型号：</strong><span id="modelValue">--</span></div>
+                <div><strong>版本：</strong><span id="versionValue">--</span></div>
             </div>
 
             <div class="section-title">
-                <strong>&#31614;&#32422;&#20449;&#24687;</strong>
-                <span id="contractLine">1000Mbps &darr; 100Mbps &uarr; QCI:9</span>
+                <strong>签约信息</strong>
+                <span id="contractLine">--</span>
             </div>
 
             <div class="cell-summary">
-                <div><strong>Band</strong><span id="bandValue">N28</span></div>
-                <div><strong>ARFCN</strong><span id="arfcnValue">152650</span></div>
-                <div><strong>PCI</strong><span id="pciValue">360</span></div>
-                <div><strong>TAC</strong><span id="tacValue">1179698</span></div>
-                <div><strong>gCellID</strong><span id="gcellValue">67324/331</span></div>
+                <div><strong>Band</strong><span id="bandValue">--</span></div>
+                <div><strong>ARFCN</strong><span id="arfcnValue">--</span></div>
+                <div><strong>PCI</strong><span id="pciValue">--</span></div>
+                <div><strong>TAC</strong><span id="tacValue">--</span></div>
+                <div><strong>gCellID</strong><span id="gcellValue">--</span></div>
             </div>
 
-            <div class="metrics-grid">
-                <div class="metric"><span>NR_RSRP</span>
-                    <div class="meter" id="nrRsrp"></div>
+            <div class="metric-section">
+                <div class="metric-section-title">核心信号</div>
+                <div class="metrics-grid">
+                    <div class="metric"><span>NR_RSRP</span>
+                        <div class="meter" id="nrRsrp"></div>
+                    </div>
+                    <div class="metric"><span>NR_SINR</span>
+                        <div class="meter" id="nrSinr"></div>
+                    </div>
+                    <div class="metric"><span>NR_RSRQ</span>
+                        <div class="meter" id="nrRsrq"></div>
+                    </div>
+                    <div class="metric"><span>NR_CQI</span>
+                        <div class="meter" id="nrCqi"></div>
+                    </div>
                 </div>
-                <div class="metric"><span>NR_SINR</span>
-                    <div class="meter" id="nrSinr"></div>
+            </div>
+
+            <div class="metric-section">
+                <div class="metric-section-title">带宽与调制</div>
+                <div class="metrics-grid">
+                    <div class="metric"><span>NR_DLBW</span>
+                        <div class="meter blue" id="nrDlbw"></div>
+                    </div>
+                    <div class="metric"><span>NR_ULBW</span>
+                        <div class="meter blue" id="nrUlbw"></div>
+                    </div>
+                    <div class="metric"><span>NR_DLMCS</span>
+                        <div class="meter neutral" id="nrDlMcs"></div>
+                    </div>
+                    <div class="metric"><span>NR_ULMCS</span>
+                        <div class="meter blue" id="nrUlMcs"></div>
+                    </div>
+                    <div class="metric mimo"><span>NR_MIMO</span><strong id="mimoValue">DL: -- UL: --</strong></div>
                 </div>
-                <div class="metric"><span>NR_RSRQ</span>
-                    <div class="meter" id="nrRsrq"></div>
-                </div>
-                <div class="metric"><span>NR_ULBW</span>
-                    <div class="meter blue" id="nrUlbw"></div>
-                </div>
-                <div class="metric"><span>NR_DLBW</span>
-                    <div class="meter blue" id="nrDlbw"></div>
-                </div>
-                <div class="metric"><span>PUCCH</span>
-                    <div class="meter" id="pucch"></div>
-                </div>
-                <div class="metric"><span>PUSCH</span>
-                    <div class="meter" id="pusch"></div>
-                </div>
-                <div class="metric"><span>NR_ULMCS</span>
-                    <div class="meter blue" id="nrUlMcs"></div>
-                </div>
-                <div class="metric"><span>NR_DLMCS</span>
-                    <div class="meter neutral" id="nrDlMcs"></div>
-                </div>
-                <div class="metric mimo"><span>NR_MIMO</span><strong id="mimoValue">DL: 2 UL:
-                    2</strong></div>
-                <div class="metric"><span>NR_CQI</span>
-                    <div class="meter" id="nrCqi"></div>
+            </div>
+
+            <div class="metric-section">
+                <div class="metric-section-title">功率</div>
+                <div class="metrics-grid power-grid">
+                    <div class="metric"><span>PUCCH</span>
+                        <div class="meter" id="pucch"></div>
+                    </div>
+                    <div class="metric"><span>PUSCH</span>
+                        <div class="meter" id="pusch"></div>
+                    </div>
                 </div>
             </div>
 
             <div class="traffic-grid">
-                <div><strong>&#19979;&#36733;&#36895;&#29575;</strong><span id="downloadRate">14.73Kbps</span>
-                </div>
-                <div><strong>&#19978;&#20256;&#36895;&#29575;</strong><span
-                        id="uploadRate">6.54Kbps</span></div>
-                <div><strong>&#26412;&#26085;&#19979;&#36733;</strong><span id="todayDownload">7.23GB</span>
-                </div>
-                <div><strong>&#26412;&#26085;&#19978;&#20256;</strong><span
-                        id="todayUpload">1.01GB</span></div>
-                <div><strong>&#26412;&#26376;&#19979;&#36733;</strong><span id="monthDownload">42.88GB</span>
-                </div>
-                <div><strong>&#26412;&#26376;&#19978;&#20256;</strong><span
-                        id="monthUpload">2.94GB</span></div>
+                <div><strong>下载速率</strong><span id="downloadRate">--</span></div>
+                <div><strong>上传速率</strong><span id="uploadRate">--</span></div>
+                <div><strong>今日下载</strong><span id="todayDownload">--</span></div>
+                <div><strong>今日上传</strong><span id="todayUpload">--</span></div>
+                <div><strong>本月下载</strong><span id="monthDownload">--</span></div>
+                <div><strong>本月上传</strong><span id="monthUpload">--</span></div>
             </div>
 
             <div class="table-wrap">
@@ -222,39 +231,69 @@
             </div>
         </section>
 
-        <section class="panel tab-panel" id="panel-plugins">
-            <div class="plugin-grid">
-                <div>
-                    <strong>&#20449;&#21495;&#38754;&#26495;</strong><span>&#24050;&#21551;&#29992;</span>
-                </div>
-                <div><strong>&#26085;&#24535;</strong><span>&#24050;&#21551;&#29992;</span></div>
-                <div>
-                    <strong>&#37197;&#32622;&#20445;&#23384;</strong><span>&#24050;&#21551;&#29992;</span>
-                </div>
-                <div><strong>&#30495;&#23454;&#35774;&#22791;&#36866;&#37197;</strong><span>&#24453;&#25509;&#20837;</span>
-                </div>
-            </div>
-        </section>
-
         <section class="panel tab-panel" id="panel-phone">
             <div class="phone-tabs">
                 <button class="phone-tab active" data-phone-tab="cellular">&#34562;&#31389;</button>
                 <button class="phone-tab" data-phone-tab="wifi">WLAN</button>
-            </div>
-            <div class="phone-toolbar">
-                <button id="refreshPhoneSignal">&#21047;&#26032;&#25163;&#26426;&#20449;&#21495;
-                </button>
-                <button id="requestPhonePermission">&#25480;&#26435;</button>
             </div>
             <div class="phone-message" id="phoneSignalMessage">&#31561;&#24453;&#35835;&#21462;&#25163;&#26426;&#20449;&#21495;&#12290;</div>
             <div class="phone-panel active" id="phoneCellularPanel">
                 <div id="phoneCellularCards" class="phone-cellular-cards"></div>
             </div>
             <div class="phone-panel" id="phoneWifiPanel">
-                <div class="wifi-grid" id="phoneWifiGrid"></div>
+                <div class="wifi-view-tabs">
+                    <button class="wifi-view-tab active" data-wifi-view="graph">&#22270;&#24418;</button>
+                    <button class="wifi-view-tab" data-wifi-view="list">&#21015;&#34920;</button>
+                </div>
+                <div class="wifi-view active" id="wifiGraphView">
+                    <div class="wifi-graphs" id="wifiGraphs"></div>
+                </div>
+                <div class="wifi-view" id="wifiListView">
+                    <button class="wifi-help-link" id="wifiHelpLink" type="button">&#28857;&#20987;&#26597;&#30475;&#34920;&#26684;&#39033;&#35828;&#26126;</button>
+                    <div class="wifi-table-wrap">
+                        <table class="wifi-table">
+                            <thead>
+                            <tr>
+                                <th>ssid</th>
+                                <th>freq</th>
+                                <th>std</th>
+                                <th>band</th>
+                                <th>ant</th>
+                                <th>rssi</th>
+                                <th>txpwr</th>
+                                <th>ue</th>
+                                <th>busy</th>
+                                <th>B</th>
+                                <th>R</th>
+                            </tr>
+                            </thead>
+                            <tbody id="phoneWifiRows"></tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         </section>
     </main>
+
+    <div class="wifi-help-modal" id="wifiHelpModal" hidden>
+        <div class="wifi-help-card" role="dialog" aria-modal="true" aria-labelledby="wifiHelpTitle">
+            <h2 id="wifiHelpTitle">&#34920;&#26684;&#39033;&#30446;&#35828;&#26126;</h2>
+            <ol>
+                <li>ssid&#20026;&#32593;&#32476;&#21517;&#31216;&#65307;</li>
+                <li>freq&#20026;&#24037;&#20316;&#39057;&#29575;&#65288;&#21333;&#20301;MHz&#65289;&#65307;</li>
+                <li>standard&#25351;&#21327;&#35758;&#29256;&#26412;&#65288;Wi-Fi 4/5/6/7&#65289;&#65307;</li>
+                <li>Band&#26159;&#20449;&#36947;&#39057;&#29575;&#23485;&#24230;&#65288;MHz&#65289;&#65307;</li>
+                <li>ant&#20026;&#22825;&#32447;&#25968;&#65292;&#22823;&#22810;&#25968;&#25509;&#20837;&#28857;&#20026;2&#20010;&#65292;&#39640;&#31471;&#30340;&#21487;&#33021;&#20026;4&#65307;</li>
+                <li>rssi&#34920;&#31034;&#25163;&#26426;&#25509;&#25910;&#21040;&#20449;&#21495;&#24378;&#24230;&#65288;dBm&#65289;&#65307;</li>
+                <li>txpwr&#26159;&#25509;&#20837;&#28857;&#21457;&#23556;&#21151;&#29575;&#65288;dBm&#65289;&#65292;&#37096;&#20998;&#21378;&#23478;&#25968;&#25454;&#21487;&#33021;&#19981;&#20934;&#65307;</li>
+                <li>ue&#34920;&#31034;&#24403;&#21069;ssid&#19978;&#30340;&#23458;&#25143;&#31471;&#25968;&#37327;&#65307;</li>
+                <li>busy&#34920;&#31034;&#20449;&#36947;&#20351;&#29992;&#29575;&#65292;&#21453;&#26144;&#35813;&#25509;&#20837;&#28857;&#25152;&#22312;&#20301;&#32622;&#19978;&#30456;&#24212;&#39057;&#29575;&#30340;&#25317;&#22581;&#31243;&#24230;&#65307;</li>
+                <li>B&#34920;&#31034;&#26159;&#21542;&#25903;&#25345;&#27874;&#26463;&#25104;&#24418;&#65307;</li>
+                <li>R&#34920;&#31034;&#25509;&#20837;&#28857;&#26159;&#21542;&#25903;&#25345;&#24555;&#36895;&#28459;&#28216;&#65288;802.11r/k/v&#65289;&#12290;</li>
+            </ol>
+            <button id="wifiHelpOk" type="button">OK</button>
+        </div>
+    </div>
 
     <footer class="bottom-bar">
         <button id="rebootDevice">&#37325;&#21551;</button>

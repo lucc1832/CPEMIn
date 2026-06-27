@@ -379,6 +379,41 @@ function firstValue(source, keys) {
   return undefined;
 }
 
+function normalizeBandToken(value) {
+  const text = String(value || "").trim().toUpperCase();
+  if (!text) return "";
+  return /^\d+$/.test(text) ? `N${text}` : text;
+}
+
+function splitCellValues(value, type = "text") {
+  if (value === undefined || value === null || value === "") return [];
+  if (Array.isArray(value)) return value.flatMap(item => splitCellValues(item, type));
+  const text = String(value).trim();
+  if (!text) return [];
+  if (type === "band") {
+    const matches = text.toUpperCase().match(/[A-Z]?\d+[A-Z]?/g);
+    return (matches && matches.length ? matches : [text]).map(normalizeBandToken).filter(Boolean);
+  }
+  return text.split(/[,，|、;+\/\s]+/).map(item => item.trim()).filter(Boolean);
+}
+
+function firstCellValue(value, type = "text") {
+  const list = splitCellValues(value, type);
+  return list.length ? list[0] : value;
+}
+
+function firstCellNumber(value) {
+  return normalizeNumber(firstCellValue(value));
+}
+
+function displayCellPci(value) {
+  const text = String(value ?? "").trim();
+  if (!text) return "--";
+  const number = normalizeNumber(text);
+  if (!hasNumber(number)) return text;
+  return String(Math.trunc(number)).padStart(3, "0");
+}
+
 function carrierNameFromPlmn(value) {
   const plmn = String(value || "").trim();
   if (["46000", "46002", "46004", "46007", "46008", "46013"].includes(plmn)) return "\u79fb\u52a8";
@@ -458,22 +493,22 @@ function normalizeDevicePayload(raw, baseState) {
   if (state.upContract > 10000) state.upContract = Math.round(state.upContract / 1024);
   state.qci = firstValue(src, ["qci", "QCI", "NR_QCI"]) || state.qci;
   const bandValue = firstValue(src, ["band", "nr_band", "Band", "BAND_NBR", "NR_BAND", "NR_Band"]);
-  state.band = bandValue && /^\d+$/.test(String(bandValue)) ? `N${bandValue}` : (bandValue || state.band);
-  state.arfcn = normalizeNumber(firstValue(src, ["arfcn", "earfcn", "nr_arfcn", "NR_ARFCN", "EARFCN_NBR"])) ?? state.arfcn;
-  state.pci = normalizeNumber(firstValue(src, ["pci", "nr_pci", "PCI", "PCI_NBR", "NR_PCI"])) ?? state.pci;
+  state.band = normalizeBandToken(firstCellValue(bandValue, "band")) || state.band;
+  state.arfcn = firstCellNumber(firstValue(src, ["arfcn", "earfcn", "nr_arfcn", "NR_ARFCN", "EARFCN_NBR"])) ?? state.arfcn;
+  state.pci = firstCellNumber(firstValue(src, ["pci", "nr_pci", "PCI", "PCI_NBR", "NR_PCI"])) ?? state.pci;
   state.tac = String(firstValue(src, ["tac", "TAC"]) || state.tac);
   state.gCellId = formatCellId(firstValue(src, ["gCellId", "gcellid", "cell_id", "nr_cell_id", "NCGI", "ECGI"]) || state.gCellId);
 
-  state.metrics.nrRsrp = normalizeNumber(firstValue(src, ["nrRsrp", "nr_rsrp", "SSB_RSRP", "RSRP_NBR", "NR_RSRP", "rsrp", "RSRP"])) ?? state.metrics.nrRsrp;
-  state.metrics.nrRsrq = normalizeNumber(firstValue(src, ["nrRsrq", "nr_rsrq", "SSB_RSRQ", "RSRQ_NBR", "NR_RSRQ", "rsrq", "RSRQ"])) ?? state.metrics.nrRsrq;
-  state.metrics.nrSinr = normalizeNumber(firstValue(src, ["nrSinr", "nr_sinr", "SSB_SINR", "SINR_NBR", "NR_SINR", "sinr", "SINR"])) ?? state.metrics.nrSinr;
-  state.metrics.nrDlbw = normalizeNumber(firstValue(src, ["nrDlbw", "dlbw", "dl_bw", "DlBandWidth", "DLBandwidth", "NR_DLBW", "NR_DL_BW"])) ?? state.metrics.nrDlbw;
-  state.metrics.nrUlbw = normalizeNumber(firstValue(src, ["nrUlbw", "ulbw", "ul_bw", "UlBandWidth", "ULBandwidth", "NR_ULBW", "NR_UL_BW"])) ?? state.metrics.nrUlbw;
-  state.metrics.nrCqi = normalizeNumber(firstValue(src, ["nrCqi", "cqi", "CQI", "NR_CQI", "LTE_CQI"])) ?? state.metrics.nrCqi;
-  state.metrics.pusch = normalizeNumber(firstValue(src, ["pusch", "PUSCH", "PUSCH_TX_Power", "NR_Power", "LTE_Power"])) ?? state.metrics.pusch;
-  state.metrics.pucch = normalizeNumber(firstValue(src, ["pucch", "PUCCH", "PUCCH_TX_Power"])) ?? state.metrics.pucch;
-  state.metrics.nrDlMcs = normalizeNumber(firstValue(src, ["nrDlMcs", "dl_mcs", "DlMCS", "NR_DLMCS", "NR_DL_MCS"])) ?? state.metrics.nrDlMcs;
-  state.metrics.nrUlMcs = normalizeNumber(firstValue(src, ["nrUlMcs", "ul_mcs", "UlMCS", "NR_ULMCS", "NR_UL_MCS"])) ?? state.metrics.nrUlMcs;
+  state.metrics.nrRsrp = firstCellNumber(firstValue(src, ["nrRsrp", "nr_rsrp", "SSB_RSRP", "RSRP_NBR", "NR_RSRP", "rsrp", "RSRP"])) ?? state.metrics.nrRsrp;
+  state.metrics.nrRsrq = firstCellNumber(firstValue(src, ["nrRsrq", "nr_rsrq", "SSB_RSRQ", "RSRQ_NBR", "NR_RSRQ", "rsrq", "RSRQ"])) ?? state.metrics.nrRsrq;
+  state.metrics.nrSinr = firstCellNumber(firstValue(src, ["nrSinr", "nr_sinr", "SSB_SINR", "SINR_NBR", "NR_SINR", "sinr", "SINR"])) ?? state.metrics.nrSinr;
+  state.metrics.nrDlbw = firstCellNumber(firstValue(src, ["nrDlbw", "dlbw", "dl_bw", "DlBandWidth", "DLBandwidth", "NR_DLBW", "NR_DL_BW"])) ?? state.metrics.nrDlbw;
+  state.metrics.nrUlbw = firstCellNumber(firstValue(src, ["nrUlbw", "ulbw", "ul_bw", "UlBandWidth", "ULBandwidth", "NR_ULBW", "NR_UL_BW"])) ?? state.metrics.nrUlbw;
+  state.metrics.nrCqi = firstCellNumber(firstValue(src, ["nrCqi", "cqi", "CQI", "NR_CQI", "LTE_CQI"])) ?? state.metrics.nrCqi;
+  state.metrics.pusch = firstCellNumber(firstValue(src, ["pusch", "PUSCH", "PUSCH_TX_Power", "NR_Power", "LTE_Power"])) ?? state.metrics.pusch;
+  state.metrics.pucch = firstCellNumber(firstValue(src, ["pucch", "PUCCH", "PUCCH_TX_Power"])) ?? state.metrics.pucch;
+  state.metrics.nrDlMcs = firstCellNumber(firstValue(src, ["nrDlMcs", "dl_mcs", "DlMCS", "NR_DLMCS", "NR_DL_MCS"])) ?? state.metrics.nrDlMcs;
+  state.metrics.nrUlMcs = firstCellNumber(firstValue(src, ["nrUlMcs", "ul_mcs", "UlMCS", "NR_ULMCS", "NR_UL_MCS"])) ?? state.metrics.nrUlMcs;
   state.metrics.mimoDl = firstValue(src, ["mimoDl", "DlMimo", "NR_MIMO_DL", "MIMO_DL"]) || state.metrics.mimoDl;
   state.metrics.mimoUl = firstValue(src, ["mimoUl", "UlMimo", "NR_MIMO_UL", "MIMO_UL"]) || state.metrics.mimoUl;
 
@@ -501,23 +536,30 @@ function normalizeDevicePayload(raw, baseState) {
 
   const rawCells = firstValue(src, ["cells", "neighborCells", "ncell_list", "neighbors", "cellList"]);
   if (Array.isArray(rawCells) && rawCells.length) {
-    state.cells = rawCells.slice(0, 12).map((cell, index) => ({
-      band: String(firstValue(cell, ["band", "Band", "nr_band"]) || state.band),
-      earfcn: normalizeNumber(firstValue(cell, ["earfcn", "arfcn", "nr_arfcn"])) ?? state.arfcn,
-      pci: String(firstValue(cell, ["pci", "PCI", "nr_pci"]) || index + 1),
-      rsrp: normalizeNumber(firstValue(cell, ["rsrp", "RSRP", "nr_rsrp"])) ?? -100,
-      rsrq: normalizeNumber(firstValue(cell, ["rsrq", "RSRQ", "nr_rsrq"])) ?? -20,
-      sinr: normalizeNumber(firstValue(cell, ["sinr", "SINR", "nr_sinr"])) ?? 0,
+    state.cells = rawCells.slice(0, 24).map((cell, index) => ({
+      band: normalizeBandToken(firstValue(cell, ["band", "Band", "nr_band"]) || state.band),
+      earfcn: firstCellNumber(firstValue(cell, ["earfcn", "arfcn", "nr_arfcn"])) ?? state.arfcn,
+      pci: displayCellPci(firstValue(cell, ["pci", "PCI", "nr_pci"]) || index + 1),
+      rsrp: firstCellNumber(firstValue(cell, ["rsrp", "RSRP", "nr_rsrp"])) ?? state.metrics.nrRsrp,
+      rsrq: firstCellNumber(firstValue(cell, ["rsrq", "RSRQ", "nr_rsrq"])) ?? state.metrics.nrRsrq,
+      sinr: firstCellNumber(firstValue(cell, ["sinr", "SINR", "nr_sinr"])) ?? state.metrics.nrSinr,
     }));
   } else if (firstValue(src, ["BAND_NBR", "EARFCN_NBR", "PCI_NBR", "RSRP_NBR", "SINR_NBR"])) {
-    state.cells = [{
-      band: String(firstValue(src, ["BAND_NBR"]) || state.band),
-      earfcn: normalizeNumber(firstValue(src, ["EARFCN_NBR"])) ?? state.arfcn,
-      pci: String(firstValue(src, ["PCI_NBR"]) || state.pci),
-      rsrp: normalizeNumber(firstValue(src, ["RSRP_NBR", "SSB_RSRP"])) ?? state.metrics.nrRsrp,
-      rsrq: normalizeNumber(firstValue(src, ["SSB_RSRQ", "RSRQ_NBR", "RSRQ"])) ?? state.metrics.nrRsrq,
-      sinr: normalizeNumber(firstValue(src, ["SINR_NBR", "SSB_SINR"])) ?? state.metrics.nrSinr,
-    }];
+    const bands = splitCellValues(firstValue(src, ["BAND_NBR"]), "band");
+    const earfcns = splitCellValues(firstValue(src, ["EARFCN_NBR"]));
+    const pcis = splitCellValues(firstValue(src, ["PCI_NBR"]));
+    const rsrps = splitCellValues(firstValue(src, ["RSRP_NBR", "SSB_RSRP"]));
+    const rsrqs = splitCellValues(firstValue(src, ["SSB_RSRQ", "RSRQ_NBR", "RSRQ"]));
+    const sinrs = splitCellValues(firstValue(src, ["SINR_NBR", "SSB_SINR"]));
+    const rowCount = Math.min(24, Math.max(bands.length, earfcns.length, pcis.length, rsrps.length, rsrqs.length, sinrs.length));
+    state.cells = Array.from({ length: rowCount }, (_, index) => ({
+      band: bands[index] || bands[0] || state.band,
+      earfcn: firstCellNumber(earfcns[index] ?? earfcns[0]) ?? state.arfcn,
+      pci: displayCellPci(pcis[index] ?? pcis[0] ?? state.pci),
+      rsrp: firstCellNumber(rsrps[index] ?? rsrps[0]) ?? state.metrics.nrRsrp,
+      rsrq: firstCellNumber(rsrqs[index] ?? rsrqs[0]) ?? state.metrics.nrRsrq,
+      sinr: firstCellNumber(sinrs[index] ?? sinrs[0]) ?? state.metrics.nrSinr,
+    }));
   }
 
   return state;
@@ -721,6 +763,26 @@ function phoneValue(value) {
   return value === undefined || value === null || value === "" ? "N/A" : value;
 }
 
+function escapeHtml(value) {
+  return String(phoneValue(value)).replace(/[&<>"']/g, char => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    "\"": "&quot;",
+    "'": "&#39;",
+  }[char]));
+}
+
+function escapeRawHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, char => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    "\"": "&quot;",
+    "'": "&#39;",
+  }[char]));
+}
+
 function phoneMetric(value, type) {
   const numeric = normalizeNumber(value);
   if (numeric === undefined) return `<div class="mini-meter empty">N/A</div>`;
@@ -733,12 +795,131 @@ function phoneMetric(value, type) {
   return mini(numeric, type, min, max);
 }
 
+function wifiBar(value, type, options = {}) {
+  const numeric = normalizeNumber(value);
+  if (numeric === undefined) return `<span class="wifi-bar empty">${escapeHtml(value)}</span>`;
+  const ranges = {
+    band: [20, 160],
+    rssi: [-90, -15],
+    txpwr: [0, 30],
+    busy: [0, 100],
+  };
+  const [min, max] = options.range || ranges[type] || [0, 100];
+  const percent = Math.max(4, Math.min(100, ((numeric - min) / (max - min)) * 100));
+  let color = "var(--cyan)";
+  if (type === "rssi") color = numeric >= -55 ? "var(--green)" : numeric >= -70 ? "var(--yellow)" : numeric >= -82 ? "var(--orange)" : "var(--red)";
+  if (type === "txpwr") color = numeric >= 28 ? "var(--red)" : numeric >= 20 ? "var(--yellow)" : "var(--green)";
+  if (type === "busy") color = numeric <= 25 ? "var(--green)" : numeric <= 60 ? "var(--yellow)" : "var(--red)";
+  return `<span class="wifi-bar" style="--fill:${percent}%;--bar:${color}"><b>${escapeHtml(options.label ?? value)}</b></span>`;
+}
+
+function wifiStandardLabel(value) {
+  const key = String(phoneValue(value)).toLowerCase();
+  const labels = {
+    "n": "n",
+    "ac": "ac",
+    "ax": "ax",
+    "be": "be",
+    "4": "n",
+    "5": "ac",
+    "6": "ax",
+    "7": "be",
+  };
+  return labels[key] || phoneValue(value);
+}
+
+function buildWifiRows(wifi) {
+  const list = Array.isArray(wifi?.networks) ? wifi.networks : [];
+  if (list.length) return list;
+  return [{
+    ssid: wifi?.ssid,
+    bssid: wifi?.bssid,
+    freq: wifi?.frequency,
+    std: wifi?.standard || "N/A",
+    band: wifi?.band || "N/A",
+    ant: wifi?.ant || "N/A",
+    rssi: wifi?.rssi,
+    txpwr: wifi?.txpwr || "N/A",
+    ue: wifi?.ue || "N/A",
+    busy: wifi?.busy || "N/A",
+    beamforming: wifi?.beamforming || "",
+    roaming: wifi?.roaming || "",
+  }];
+}
+
+function renderWifiTable(rows) {
+  const body = $("#phoneWifiRows");
+  if (!body) return;
+  body.innerHTML = rows.length ? rows.map(row => `
+    <tr>
+      <td class="wifi-ssid">${escapeHtml(row.ssid)}</td>
+      <td>${escapeHtml(row.freq)}</td>
+      <td>${escapeHtml(wifiStandardLabel(row.std || row.standard))}</td>
+      <td>${wifiBar(row.band, "band")}</td>
+      <td>${escapeHtml(row.ant)}</td>
+      <td>${wifiBar(row.rssi, "rssi")}</td>
+      <td>${wifiBar(row.txpwr, "txpwr")}</td>
+      <td>${escapeHtml(row.ue)}</td>
+      <td>${wifiBar(row.busy, "busy", { label: normalizeNumber(row.busy) === undefined ? row.busy : `${normalizeNumber(row.busy)}%` })}</td>
+      <td>${escapeRawHtml(row.beamforming || row.b || "")}</td>
+      <td>${escapeRawHtml(row.roaming || row.r || "")}</td>
+    </tr>
+  `).join("") : `<tr><td colspan="11">\u6682\u672a\u8bfb\u5230 WLAN \u626b\u63cf\u5217\u8868</td></tr>`;
+}
+
+function graphPoint(row, range) {
+  const freq = normalizeNumber(row.freq);
+  const rssi = normalizeNumber(row.rssi);
+  if (freq === undefined || rssi === undefined) return "";
+  if (freq < range.min || freq > range.max) return "";
+  const left = Math.max(0, Math.min(100, ((freq - range.min) / (range.max - range.min)) * 100));
+  const top = Math.max(0, Math.min(100, ((-30 - rssi) / 65) * 100));
+  const name = escapeHtml(row.ssid);
+  const color = rssi >= -55 ? "var(--green)" : rssi >= -70 ? "var(--yellow)" : rssi >= -82 ? "var(--orange)" : "var(--red)";
+  return `<span class="wifi-plot-dot" style="left:${left}%;top:${top}%;--dot:${color}" title="${name} ${escapeHtml(row.rssi)}dBm"><i>${name}</i></span>`;
+}
+
+function axisLabels(values) {
+  return values.map(value => `<span>${value}</span>`).join("");
+}
+
+function renderWifiGraphs(rows) {
+  const graphs = $("#wifiGraphs");
+  if (!graphs) return;
+  const bands = [
+    { title: "2.4G+5.2G", min: 2400, max: 5320, labels: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 36, 40, 44, 48, 52, 56, 60, 64] },
+    { title: "5.5G-5.8G", min: 5500, max: 5850, labels: [100, 104, 108, 112, 116, 120, 124, 128, 132, 136, 140, 144, 149, 153, 157, 161, 165] },
+    { title: "6G", min: 5900, max: 7125, labels: [5, 21, 37, 53, 69, 85, 101, 117, 133, 149, 165, 181, 197, 213, 229] },
+  ];
+  graphs.innerHTML = bands.map(band => {
+    const dots = rows.map(row => graphPoint(row, band)).join("");
+    return `
+      <section class="wifi-graph">
+        <span class="wifi-graph-title">${band.title}</span>
+        <div class="wifi-graph-gridlines">
+          <span>-30</span><span>-40</span><span>-50</span><span>-60</span><span>-70</span><span>-80</span><span>-90</span>
+          ${dots}
+        </div>
+        <div class="wifi-axis">${axisLabels(band.labels)}</div>
+      </section>
+    `;
+  }).join("");
+}
+
+function renderWifiPanel(wifi) {
+  const rows = buildWifiRows(wifi)
+    .filter(row => phoneValue(row.ssid) !== "N/A" || phoneValue(row.bssid) !== "N/A")
+    .sort((left, right) => (normalizeNumber(right.rssi) ?? -999) - (normalizeNumber(left.rssi) ?? -999));
+  renderWifiGraphs(rows);
+  renderWifiTable(rows);
+}
+
 function renderPhoneSignals(payload) {
   const message = $("#phoneSignalMessage");
   if (!payload?.ok) {
     message.textContent = payload?.error || text.phoneNoNative;
     $("#phoneCellularCards").innerHTML = "";
-    $("#phoneWifiGrid").innerHTML = "";
+    renderWifiPanel(payload?.wifi || {});
     return;
   }
 
@@ -746,12 +927,12 @@ function renderPhoneSignals(payload) {
   const groups = Array.isArray(payload.cellular) ? payload.cellular : [];
   $("#phoneCellularCards").innerHTML = groups.length ? groups.map(group => `
     <section class="phone-card">
-      <h2>${group.slot}: ${phoneValue(group.title)}</h2>
+      <h2>${escapeHtml(group.slot)}: ${escapeHtml(group.title)}</h2>
       <div class="phone-summary">
-        <div><strong>PLMN</strong><span>${phoneValue(group.plmn)}</span></div>
-        <div><strong>TAC</strong><span>${phoneValue(group.tac)}</span></div>
-        <div><strong>CellID</strong><span>${phoneValue(group.cellId)}</span></div>
-        <div><strong>SINR</strong><span class="boxed">${phoneValue(group.sinr)}</span></div>
+        <div><strong>PLMN</strong><span>${escapeHtml(group.plmn)}</span></div>
+        <div><strong>TAC</strong><span>${escapeHtml(group.tac)}</span></div>
+        <div><strong>CellID</strong><span>${escapeHtml(group.cellId)}</span></div>
+        <div><strong>SINR</strong><span class="boxed">${escapeHtml(group.sinr)}</span></div>
       </div>
       <div class="table-wrap phone-table-wrap">
         <table class="phone-table">
@@ -761,12 +942,12 @@ function renderPhoneSignals(payload) {
           <tbody>
             ${(group.cells || []).map(cell => `
               <tr>
-                <td>${phoneValue(cell.arfcn)}</td>
-                <td>${phoneValue(cell.pci)}</td>
+                <td>${escapeHtml(cell.arfcn)}</td>
+                <td>${escapeHtml(cell.pci)}</td>
                 <td>${phoneMetric(cell.rsrp, "rsrp")}</td>
                 <td>${phoneMetric(cell.rsrq, "rsrq")}</td>
                 <td>${phoneMetric(cell.sinr, "sinr")}</td>
-                <td>${phoneValue(cell.name || cell.type)}</td>
+                <td>${escapeHtml(cell.name || cell.type)}</td>
               </tr>
             `).join("") || `<tr><td colspan="6">\u6682\u672a\u8bfb\u5230\u5c0f\u533a\u4fe1\u606f</td></tr>`}
           </tbody>
@@ -775,14 +956,7 @@ function renderPhoneSignals(payload) {
     </section>
   `).join("") : `<div class="phone-empty">\u6682\u672a\u8bfb\u5230\u8702\u7a9d\u5c0f\u533a\u4fe1\u606f\u3002</div>`;
 
-  const wifi = payload.wifi || {};
-  $("#phoneWifiGrid").innerHTML = `
-    <div><strong>SSID</strong><span>${phoneValue(wifi.ssid)}</span></div>
-    <div><strong>BSSID</strong><span>${phoneValue(wifi.bssid)}</span></div>
-    <div><strong>RSSI</strong><span>${phoneValue(wifi.rssi)} dBm</span></div>
-    <div><strong>\u901f\u7387</strong><span>${phoneValue(wifi.linkSpeed)}</span></div>
-    <div><strong>\u9891\u7387</strong><span>${phoneValue(wifi.frequency)}</span></div>
-  `;
+  renderWifiPanel(payload.wifi || {});
 }
 
 async function refreshPhoneSignals() {
@@ -800,13 +974,6 @@ async function refreshPhoneSignals() {
   }
 }
 
-function requestPhonePermission() {
-  if (window.CpeNative?.requestPhonePermissions) {
-    window.CpeNative.requestPhonePermissions();
-    setTimeout(refreshPhoneSignals, 800);
-  }
-}
-
 function bindPhoneTabs() {
   $$(".phone-tab").forEach(button => {
     button.addEventListener("click", () => {
@@ -814,6 +981,17 @@ function bindPhoneTabs() {
       $$(".phone-panel").forEach(panel => panel.classList.remove("active"));
       button.classList.add("active");
       $(`#phone${button.dataset.phoneTab === "wifi" ? "Wifi" : "Cellular"}Panel`).classList.add("active");
+    });
+  });
+}
+
+function bindWifiTabs() {
+  $$(".wifi-view-tab").forEach(button => {
+    button.addEventListener("click", () => {
+      $$(".wifi-view-tab").forEach(tab => tab.classList.remove("active"));
+      $$(".wifi-view").forEach(panel => panel.classList.remove("active"));
+      button.classList.add("active");
+      $(`#wifi${button.dataset.wifiView === "list" ? "List" : "Graph"}View`)?.classList.add("active");
     });
   });
 }
@@ -867,6 +1045,7 @@ async function maybeReadRealDevice(payload) {
 }
 
 function colorFor(value, type) {
+  if (!hasNumber(value)) return "var(--panel-soft)";
   if (type === "rsrp") {
     if (value >= -85) return "var(--green-dark)";
     if (value >= -98) return "var(--green)";
@@ -888,9 +1067,22 @@ function colorFor(value, type) {
   return "var(--green)";
 }
 
+function colorForTemperature(value) {
+  if (!hasNumber(value)) return "var(--panel-soft)";
+  if (value <= 55) return "var(--green)";
+  if (value <= 65) return "var(--yellow)";
+  if (value <= 75) return "var(--orange)";
+  return "var(--red)";
+}
+
 function percent(value, min, max) {
   if (!hasNumber(value)) return 0;
   return Math.max(0, Math.min(100, ((value - min) / (max - min)) * 100));
+}
+
+function setText(selector, value) {
+  const el = $(selector);
+  if (el) el.textContent = value;
 }
 
 function meter(selector, value, label, options = {}) {
@@ -902,11 +1094,51 @@ function meter(selector, value, label, options = {}) {
   el.style.setProperty("--color", options.color || "var(--green)");
 }
 
+// 顶部概览卡用同一套变量上色，后面想调阈值只改这里。
+function paintTile(selector, value, type, min, max, colorOverride) {
+  const el = $(selector);
+  if (!el) return;
+  const fill = hasNumber(value) ? percent(value, min, max) : 0;
+  const color = colorOverride || colorFor(value, type);
+  el.style.setProperty("--tile-fill", `${Math.round(fill)}%`);
+  el.style.setProperty("--tile-color", color);
+}
+
 function mini(value, type, min, max, suffix = "") {
   if (!hasNumber(value)) return `<div class="mini-meter empty">--</div>`;
   const fill = percent(value, min, max);
   const color = colorFor(value, type);
   return `<div class="mini-meter" style="--fill:${fill}%;--color:${color}">${value}${suffix}</div>`;
+}
+
+function speedLabel(valueKbps) {
+  if (!hasNumber(valueKbps)) return "--";
+  if (valueKbps >= 1000) {
+    const mbps = valueKbps / 1000;
+    return `${mbps >= 100 ? mbps.toFixed(0) : mbps.toFixed(2)}Mbps`;
+  }
+  return `${valueKbps.toFixed(2)}Kbps`;
+}
+
+function formatBandList(value) {
+  const list = splitCellValues(value, "band");
+  return list.length ? list.join("\n") : "--";
+}
+
+function signalGrade(sinr, rsrp) {
+  if (hasNumber(sinr)) {
+    if (sinr >= 20) return "优秀";
+    if (sinr >= 10) return "良好";
+    if (sinr >= 3) return "一般";
+    return "较弱";
+  }
+  if (hasNumber(rsrp)) {
+    if (rsrp >= -85) return "优秀";
+    if (rsrp >= -98) return "良好";
+    if (rsrp >= -105) return "一般";
+    return "较弱";
+  }
+  return "等待数据";
 }
 
 // 根据当前页面状态刷新 UI；这里不直接请求网络，只负责把 state 画出来。
@@ -917,20 +1149,40 @@ function renderStatus(payload) {
   const m = s.metrics;
   const t = s.traffic;
   const vendor = vendorLabel[s.vendor] || vendorLabel[currentSettings.vendor] || s.vendor;
+  const refreshSeconds = normalizeRefreshSeconds(currentSettings.refreshInterval, DEFAULT_FIREHOME_REFRESH_SECONDS);
+  const temperatureFill = percent(s.temperature, 20, 70);
+  const temperatureColor = colorForTemperature(s.temperature);
 
   $("#deviceHeadline").textContent = `${vendor} - ${s.model} - ${s.connected ? "\u5df2\u8fde\u63a5" : "\u672a\u8fde\u63a5"}`;
   $("#operatorName").textContent = s.operator;
   $("#networkMode").textContent = s.mode;
+  setText("#refreshBadge", currentSettings.autoRefresh ? `${refreshSeconds}\u79d2` : "\u624b\u52a8");
   $("#modelValue").textContent = s.model;
   $("#versionValue").textContent = s.version;
   $("#contractLine").textContent = `${displayValue(s.downContract, "Mbps")} \u2193 ${displayValue(s.upContract, "Mbps")} \u2191 QCI:${displayValue(s.qci)}`;
-  $("#bandValue").textContent = s.band;
+  $("#bandValue").textContent = formatBandList(s.band);
   $("#arfcnValue").textContent = s.arfcn;
   $("#pciValue").textContent = s.pci;
   $("#tacValue").textContent = s.tac;
   $("#gcellValue").textContent = s.gCellId;
-  $("#temperatureBar").style.background = `linear-gradient(90deg, var(--green) 0 ${percent(s.temperature, 20, 70)}%, transparent ${percent(s.temperature, 20, 70)}%), #f7fbfb`;
+  $("#temperatureBar").style.background = `linear-gradient(90deg, ${temperatureColor} 0 ${temperatureFill}%, transparent ${temperatureFill}%), #f7fbfb`;
   $("#temperatureBar span").textContent = displayValue(s.temperature, "\u00b0C");
+
+  setText("#primarySinr", displayValue(m.nrSinr, "dB"));
+  setText("#primaryRsrp", displayValue(m.nrRsrp, "dBm"));
+  setText("#primaryTemp", displayValue(s.temperature, "\u00b0C"));
+  setText("#primaryDown", speedLabel(t.downloadRateKbps));
+  setText("#primaryUp", speedLabel(t.uploadRateKbps));
+  setText("#primaryBand", formatBandList(s.band));
+  setText("#primaryCell", `PCI ${displayValue(s.pci)}`);
+  setText("#signalGrade", signalGrade(m.nrSinr, m.nrRsrp));
+
+  paintTile("#sinrTile", m.nrSinr, "sinr", -20, 30);
+  paintTile("#rsrpTile", m.nrRsrp, "rsrp", -115, -55);
+  paintTile("#tempTile", s.temperature, "temp", 20, 70, temperatureColor);
+  paintTile("#downTile", t.downloadRateKbps, "rate", 0, 100000, hasNumber(t.downloadRateKbps) ? "var(--blue)" : "var(--panel-soft)");
+  paintTile("#upTile", t.uploadRateKbps, "rate", 0, 50000, hasNumber(t.uploadRateKbps) ? "var(--blue)" : "var(--panel-soft)");
+  paintTile("#bandTile", s.connected ? 1 : null, "band", 0, 1, s.connected ? "var(--blue)" : "var(--panel-soft)");
 
   meter("#nrRsrp", m.nrRsrp, `${m.nrRsrp}dBm`, { fill: percent(m.nrRsrp, -115, -55), color: colorFor(m.nrRsrp, "rsrp") });
   meter("#nrSinr", m.nrSinr, `${m.nrSinr}dB`, { fill: percent(m.nrSinr, -20, 30), color: colorFor(m.nrSinr, "sinr") });
@@ -1136,8 +1388,16 @@ function bindActions() {
   $("#probeDevice").addEventListener("click", probeDevice);
   $("#openBackendPage").addEventListener("click", openBackendPage);
   $("#openBackendPageFirefly").addEventListener("click", openBackendPage);
-  $("#refreshPhoneSignal").addEventListener("click", refreshPhoneSignals);
-  $("#requestPhonePermission").addEventListener("click", requestPhonePermission);
+  $("#refreshPhoneSignal")?.addEventListener("click", refreshPhoneSignals);
+  $("#wifiHelpLink")?.addEventListener("click", () => {
+    $("#wifiHelpModal").hidden = false;
+  });
+  $("#wifiHelpOk")?.addEventListener("click", () => {
+    $("#wifiHelpModal").hidden = true;
+  });
+  $("#wifiHelpModal")?.addEventListener("click", event => {
+    if (event.target.id === "wifiHelpModal") event.currentTarget.hidden = true;
+  });
 
   $("#logoutDevice").addEventListener("click", async () => {
     await api("/api/logout", { method: "POST", body: "{}" });
@@ -1210,6 +1470,7 @@ function setupInstall() {
 async function start() {
   bindTabs();
   bindPhoneTabs();
+  bindWifiTabs();
   bindActions();
   setupInstall();
   await refresh();
